@@ -1,0 +1,23 @@
+[{
+	"resource": "/c:/Users/sgarita/Documents/GitHub/blackmatter software/matterportal-flutter/portal/lib/login_screen.dart",
+	"owner": "_generated_diagnostic_collection_name_#2",
+	"code": {
+		"value": "deprecated_member_use",
+		"target": {
+			"$mid": 1,
+			"path": "/diagnostics/deprecated_member_use",
+			"scheme": "https",
+			"authority": "dart.dev"
+		}
+	},
+	"severity": 2,
+	"message": "'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss.\nTry replacing the use of the deprecated member with the replacement. Also you must never use direct import with the path always use package",
+	"source": "dart",
+	"startLineNumber": 64,
+	"startColumn": 51,
+	"endLineNumber": 64,
+	"endColumn": 62,
+	"tags": [
+		2
+	]
+}]

@@ -1,0 +1,135 @@
+name: portal
+description: "A new Flutter project."
+publish_to: 'none'
+
+version: 1.1.0+1
+
+environment:
+  sdk: ^3.7.2
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # The following adds the Cupertino Icons font to your application.
+  # Use with the CupertinoIcons class for iOS style icons.
+  cupertino_icons: ^1.0.8
+  firebase_core: ^3.13.0
+  firebase_auth: ^5.5.2
+  package_info_plus: ^8.3.0
+  flutter_bloc: ^9.1.0
+  equatable: ^2.0.7
+  cloud_firestore: ^5.6.6
+  mockito: ^5.4.5
+  bloc_test: ^10.0.0
+  go_router: ^15.0.0
+  loading_animation_widget: ^1.3.0
+  extended_image: ^10.0.0
+  get_it: ^8.0.3
+  bloc: ^9.0.0
+  uuid: ^4.5.1
+  reorderables: ^0.6.0
+  html: ^0.15.5+1
+  audio_service: ^0.18.18
+  just_audio: ^0.10.0
+  firebase_storage: ^12.4.5
+  image: ^4.5.4
+  audio_session: ^0.2.1
+  file_picker: ^10.1.2
+  desktop_drop: ^0.6.0
+  dotted_border: ^2.1.0
+  universal_html: ^2.2.4
+  http: ^1.3.0
+  confetti: ^0.8.0
+  provider: ^6.1.4
+  mime: ^2.0.0
+  flutter_launcher_icons: ^0.14.3
+  rename: ^3.0.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  # The "flutter_lints" package below contains a set of recommended lints to
+  # encourage good coding practices. The lint set provided by the package is
+  # activated in the `analysis_options.yaml` file located at the root of your
+  # package. See that file for information about deactivating specific lint
+  # rules and activating additional ones.
+  flutter_lints: ^5.0.0
+
+# For information on the generic Dart part of this file, see the
+# following page: https://dart.dev/tools/pub/pubspec
+
+# The following section is specific to Flutter packages.
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/images/backdrop.png
+    - assets/images/ico.png
+    - assets/images/placeholder.png
+    - assets/images/dsps/7digital.jpg
+    - assets/images/dsps/acrcloud.jpg
+    - assets/images/dsps/alibaba.jpg
+    - assets/images/dsps/amazon.png
+    - assets/images/dsps/ami.png
+    - assets/images/dsps/Anghami.jpg
+    - assets/images/dsps/Apple Music.png
+    - assets/images/dsps/Audible Magic.png
+    - assets/images/dsps/Audiomack.png
+    - assets/images/dsps/BMAT.jpg
+    - assets/images/dsps/Boomplay.jpg
+    - assets/images/dsps/Claro.png
+    - assets/images/dsps/ClicknClear.png
+    - assets/images/dsps/d'Music.png
+    - assets/images/dsps/Deezer.png
+    - assets/images/dsps/Facebook.png
+    - assets/images/dsps/Gracenote.png
+    - assets/images/dsps/iHeartRadio.png
+    - assets/images/dsps/JioSaavn.png
+    - assets/images/dsps/JOOX.jpg
+    - assets/images/dsps/Kan Music.jpg
+    - assets/images/dsps/KDM(K Digital Media).png
+    - assets/images/dsps/KK Box.png
+    - assets/images/dsps/LiveOne.jpg
+    - assets/images/dsps/Medianet.png
+    - assets/images/dsps/meta.png
+    - assets/images/dsps/mixcloud.png
+    - assets/images/dsps/moodmedia.png
+    - assets/images/dsps/Pandora.png
+    - assets/images/dsps/Peloton.png
+    - assets/images/dsps/Pretzel.png
+    - assets/images/dsps/Qobuz.jpg
+    - assets/images/dsps/Resso.png
+    - assets/images/dsps/soundcloud.png
+    - assets/images/dsps/shazam.png
+    - assets/images/dsps/spotify.png
+    - assets/images/dsps/tidal.png
+    - assets/images/dsps/tiktok.png
+    - assets/images/dsps/TouchTunes.jpg
+    - assets/images/dsps/Trebel.png
+    - assets/images/dsps/Tuned Global.png
+    - assets/images/dsps/USEA.png
+    - assets/images/dsps/VL Group.webp
+    - assets/images/dsps/YouSee.png
+    - assets/images/dsps/youtube.png
+    - assets/images/dsps/instagram.png
+    - assets/images/dsps/facebook.png
+    - assets/images/dsps/x.png
+    - assets/animations/splash_animation.json
+  fonts:
+    - family: Bold
+      fonts:
+        - asset: assets/fonts/SpaceGrotesk-Bold.ttf
+    - family: SemiBold
+      fonts:
+        - asset: assets/fonts/SpaceGrotesk-SemiBold.ttf
+    - family: Medium
+      fonts:
+        - asset: assets/fonts/SpaceGrotesk-Medium.ttf
+    - family: Regular
+      fonts:
+        - asset: assets/fonts/SpaceGrotesk-Regular.ttf
+    - family: Light
+      fonts:
+        - asset: assets/fonts/SpaceGrotesk-Light.ttf
