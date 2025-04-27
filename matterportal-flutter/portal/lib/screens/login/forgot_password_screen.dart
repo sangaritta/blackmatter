@@ -1,10 +1,11 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:portal/bloc/login/forgot_password_bloc.dart';
-import 'package:portal/bloc/login/forgot_password_event.dart';
 import 'package:portal/bloc/login/forgot_password_state.dart';
+import 'package:portal/bloc/login/forgot_password_event.dart';
 import 'package:portal/screens/login/starry_night_background.dart';
 import 'package:portal/services/auth_service.dart';
 import 'package:portal/widgets/common/loading_indicator.dart';
@@ -34,23 +35,26 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
-      create: (context) => ForgotPasswordBloc(authService: AuthService.instance),
+      create: (context) => ForgotPasswordBloc(authService: AuthenticationService()),
+      // Use the correct service class name if it's AuthenticationService or AuthService.
+      // If the class is AuthService, use: ForgotPasswordBloc(authService: AuthService.instance),
       child: BlocConsumer<ForgotPasswordBloc, ForgotPasswordState>(
         listener: (context, state) {
           if (state.isSuccess) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(content: Text('Password reset email sent.')),
             );
-            Navigator.of(context).pop();
+            context.go('/login');
           }
-          if (state.errorMessage != null) {
+          if ((state.errorMessage ?? '').isNotEmpty) {
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(state.errorMessage!)),
+              SnackBar(content: Text(state.errorMessage ?? '')), // safe fallback
             );
           }
         },
         builder: (context, state) {
-          final bloc = context.read<ForgotPasswordBloc>();
+          final bool isLoading = state.isLoading;
+          final String? errorMessage = state.errorMessage;
           return Scaffold(
             resizeToAvoidBottomInset: true,
             body: Stack(
@@ -63,7 +67,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                       return Stack(
                         children: [
                           Container(
-                            decoration: const BoxDecoration(
+                            decoration: BoxDecoration(
                               gradient: LinearGradient(
                                 begin: Alignment.topCenter,
                                 end: Alignment.bottomCenter,
@@ -86,15 +90,15 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                                   width: isMobile ? constraints.maxWidth * 0.95 : 400,
                                   padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 32),
                                   decoration: BoxDecoration(
-                                    color: Colors.white.withValues(alpha: 0.13, red: 255, green: 255, blue: 255),
+                                    color: Colors.white.withAlpha(13),
                                     borderRadius: BorderRadius.circular(32),
                                     border: Border.all(
-                                      color: Colors.white.withValues(alpha: 0.19, red: 255, green: 255, blue: 255),
+                                      color: Colors.white.withAlpha(19),
                                       width: 1.5,
                                     ),
                                     boxShadow: [
                                       BoxShadow(
-                                        color: Colors.black.withValues(alpha: 0.13, red: 0, green: 0, blue: 0),
+                                        color: Colors.black.withAlpha(13),
                                         blurRadius: 36,
                                         spreadRadius: 2,
                                         offset: const Offset(0, 16),
@@ -113,7 +117,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                                             style: TextStyle(
                                               fontFamily: 'Bold',
                                               fontSize: 18,
-                                              color: Colors.white.withValues(alpha: 0.95, red: 255, green: 255, blue: 255),
+                                              color: Colors.white,
                                               letterSpacing: 1.1,
                                             ),
                                           ),
@@ -123,38 +127,61 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                                         controller: emailCtrl,
                                         label: 'Email',
                                         keyboardType: TextInputType.emailAddress,
-                                        onSubmitted: (val) => bloc.add(ForgotPasswordEmailChanged(val)),
+                                        onSubmitted: (val) => context.read<ForgotPasswordBloc>().add(ForgotPasswordEmailChanged(val)),
                                       ),
                                       const SizedBox(height: 18),
                                       ElevatedButton(
-                                        onPressed: state.isLoading
+                                        onPressed: isLoading
                                             ? null
                                             : () {
-                                                bloc.add(ForgotPasswordEmailChanged(emailCtrl.text));
-                                                bloc.add(ForgotPasswordSubmitted());
+                                                context.read<ForgotPasswordBloc>().add(ForgotPasswordEmailChanged(emailCtrl.text));
+                                                context.read<ForgotPasswordBloc>().add(ForgotPasswordSubmitted());
                                               },
                                         style: ElevatedButton.styleFrom(
-                                          backgroundColor: const Color(0xFF1A237E),
+                                          backgroundColor: Colors.transparent,
+                                          shadowColor: Colors.transparent,
+                                          foregroundColor: Colors.white,
                                           shape: RoundedRectangleBorder(
                                             borderRadius: BorderRadius.circular(24),
                                           ),
+                                          padding: EdgeInsets.zero,
+                                        ).copyWith(
+                                          elevation: MaterialStateProperty.all(0),
+                                          backgroundColor: MaterialStateProperty.all(Colors.transparent),
                                         ),
-                                        child: state.isLoading
-                                            ? const LoadingIndicator(size: 24, color: Colors.white)
-                                            : const Text(
-                                                "Send Reset Email",
-                                                style: TextStyle(
-                                                  fontFamily: 'Bold',
-                                                  fontSize: 18,
-                                                  color: Colors.white,
-                                                  letterSpacing: 1.1,
-                                                ),
-                                              ),
+                                        child: Ink(
+                                          decoration: BoxDecoration(
+                                            gradient: const LinearGradient(
+                                              colors: [
+                                                Color(0xFF4361EE),
+                                                Color(0xFF7209B7),
+                                              ],
+                                              begin: Alignment.topLeft,
+                                              end: Alignment.bottomRight,
+                                            ),
+                                            borderRadius: BorderRadius.circular(24),
+                                          ),
+                                          child: Container(
+                                            alignment: Alignment.center,
+                                            constraints: const BoxConstraints(minHeight: 50),
+                                            child: isLoading
+                                                ? const LoadingIndicator(size: 24, color: Colors.white)
+                                                : const Text(
+                                                    "Send Reset Email",
+                                                    style: TextStyle(
+                                                      fontFamily: 'Bold',
+                                                      fontSize: 18,
+                                                      color: Colors.white,
+                                                      letterSpacing: 1.1,
+                                                    ),
+                                                  ),
+                                          ),
+                                        ),
                                       ),
-                                      if (state.errorMessage != null) ...[
+                                      if ((errorMessage ?? '').isNotEmpty) ...[
                                         const SizedBox(height: 12),
                                         Text(
-                                          state.errorMessage!,
+                                          errorMessage ?? '',
                                           style: const TextStyle(color: Colors.red),
                                           textAlign: TextAlign.center,
                                         ),
@@ -175,11 +202,11 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                                 style: TextStyle(
                                   fontFamily: 'SemiBold',
                                   fontSize: 13,
-                                  color: Colors.white.withValues(alpha: 0.80, red: 255, green: 255, blue: 255),
+                                  color: Colors.white.withAlpha(80),
                                   letterSpacing: 1.05,
                                   shadows: [
                                     Shadow(
-                                      color: Colors.black.withValues(alpha: 0.18, red: 0, green: 0, blue: 0),
+                                      color: Colors.black.withAlpha(18),
                                       blurRadius: 3,
                                     ),
                                   ],
@@ -211,12 +238,12 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 2),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.14, red: 255, green: 255, blue: 255),
+        color: Colors.white.withAlpha(14),
         borderRadius: BorderRadius.circular(30),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.18, red: 255, green: 255, blue: 255), width: 1),
+        border: Border.all(color: Colors.white.withAlpha(18), width: 1),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.12, red: 0, green: 0, blue: 0),
+            color: Colors.black.withAlpha(12),
             spreadRadius: 2,
             blurRadius: 12,
             offset: const Offset(0, 4),
@@ -237,16 +264,16 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         ),
         decoration: InputDecoration(
           filled: true,
-          fillColor: Colors.white.withValues(alpha: 0.10, red: 255, green: 255, blue: 255),
+          fillColor: Colors.white.withAlpha(10),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(30),
             borderSide: BorderSide.none,
           ),
           labelText: ' $label',
           labelStyle: TextStyle(
-            fontFamily: 'SemiBold',
+            fontFamily: 'Regular',
             fontSize: 15,
-            color: Colors.white.withValues(alpha: 0.85, red: 255, green: 255, blue: 255),
+            color: Colors.white,
           ),
         ),
       ),

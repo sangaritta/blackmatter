@@ -1,42 +1,38 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
+import 'package:portal/Models/product.dart';
 
-class Project {
+class Project with ChangeNotifier {
   final String id;
-  final String projectName;
-  final String projectArtist;
-  final String uid;
+  String name;
+  String artist;
   final String notes;
-  final DateTime? updatedAt;
+  List<Product>? products;
 
   Project({
     required this.id,
-    required this.projectName,
-    required this.projectArtist,
-    required this.uid,
-    required this.notes,
-    this.updatedAt,
+    this.name = '',
+    this.artist = '',
+    this.notes = '',
+    this.products,
   });
 
-  factory Project.fromMap(Map<String, dynamic> map, String id) {
+  void updateName(String newName) {
+    name = newName;
+    notifyListeners();
+  }
+
+  void updateArtist(String newArtist) {
+    artist = newArtist;
+    notifyListeners();
+  }
+
+  factory Project.fromMap(Map<String, dynamic> map) {
     return Project(
-      id: id,
-      projectName: map['projectName'] ?? '',
-      projectArtist: map['projectArtist'] ?? '',
-      uid: map['uid'] ?? '',
+      id: map['id'] ?? '',
+      name: map['projectName'] ?? '',
+      artist: map['artist'] ?? '',
       notes: map['notes'] ?? '',
-      updatedAt: map['updatedAt'] != null ? (map['updatedAt'] as Timestamp).toDate() : null,
+      // products: not loaded in dashboard summary
     );
   }
-
-  Map<String, dynamic> toMap() {
-    return {
-      'projectName': projectName,
-      'projectArtist': projectArtist,
-      'uid': uid,
-      'notes': notes,
-      'updatedAt': updatedAt != null ? Timestamp.fromDate(updatedAt!) : null,
-    };
-  }
-
-  String get name => projectName;
 }

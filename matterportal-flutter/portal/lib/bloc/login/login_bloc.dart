@@ -4,7 +4,7 @@ import 'login_state.dart';
 import 'package:portal/services/auth_service.dart';
 
 class LoginBloc extends Bloc<LoginEvent, LoginState> {
-  final AuthService authService;
+  final AuthenticationService authService;
   LoginBloc({required this.authService}) : super(const LoginState()) {
     on<LoginEmailChanged>((event, emit) {
       emit(state.copyWith(email: event.email, errorMessage: null));
@@ -15,7 +15,10 @@ class LoginBloc extends Bloc<LoginEvent, LoginState> {
     on<LoginSubmitted>(_onLoginSubmitted);
   }
 
-  Future<void> _onLoginSubmitted(LoginSubmitted event, Emitter<LoginState> emit) async {
+  Future<void> _onLoginSubmitted(
+    LoginSubmitted event,
+    Emitter<LoginState> emit,
+  ) async {
     emit(state.copyWith(isLoading: true, errorMessage: null));
     try {
       await authService.signIn(state.email, state.password);

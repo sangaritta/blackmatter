@@ -4,7 +4,8 @@ import 'forgot_password_state.dart';
 import 'package:portal/services/auth_service.dart';
 
 class ForgotPasswordBloc extends Bloc<ForgotPasswordEvent, ForgotPasswordState> {
-  final AuthService authService;
+  final AuthenticationService authService;
+
   ForgotPasswordBloc({required this.authService}) : super(const ForgotPasswordState()) {
     on<ForgotPasswordEmailChanged>((event, emit) {
       emit(state.copyWith(email: event.email, errorMessage: null));

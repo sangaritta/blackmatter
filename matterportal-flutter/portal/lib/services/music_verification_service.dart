@@ -5,7 +5,6 @@ import 'package:html/parser.dart' show parse;
 class MusicVerificationService {
   static const String _spotifyClientId = '0417a39abe1d401bbf75166b9a695013';
   static const String _spotifyClientSecret = 'e082c66c2f06421089478d7ea101c6b1';
-  //TODO: MOVE TO BACKEND
 
   Future<bool> verifySpotifyArtist(String spotifyUrl, String artistName) async {
     try {
@@ -42,18 +41,13 @@ class MusicVerificationService {
   }
 
   Future<bool> verifyAppleMusicArtist(
-    String appleMusicUrl,
-    String artistName,
-  ) async {
+      String appleMusicUrl, String artistName) async {
     try {
       // Make a GET request to the Apple Music URL
-      final response = await http.get(
-        Uri.parse(appleMusicUrl),
-        headers: {
-          'User-Agent':
-              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-        },
-      );
+      final response = await http.get(Uri.parse(appleMusicUrl), headers: {
+        'User-Agent':
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+      });
 
       if (response.statusCode == 200) {
         // Parse the HTML content
@@ -61,8 +55,7 @@ class MusicVerificationService {
 
         // Try to find the artist name in the page title or meta tags
         final pageTitle = document.querySelector('title')?.text ?? '';
-        final metaDescription =
-            document
+        final metaDescription = document
                 .querySelector('meta[name="description"]')
                 ?.attributes['content'] ??
             '';

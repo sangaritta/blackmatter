@@ -47,7 +47,7 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
-      create: (context) => LoginBloc(authService: AuthService.instance),
+      create: (context) => LoginBloc(authService: AuthenticationService()),
       child: BlocConsumer<LoginBloc, LoginState>(
         listener: (context, state) {
           if (state.isSuccess) {
@@ -213,15 +213,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                                     Center(
                                                       child: TextButton(
                                                         onPressed: () {
-                                                          Navigator.of(
-                                                            context,
-                                                          ).push(
-                                                            MaterialPageRoute(
-                                                              builder:
-                                                                  (context) =>
-                                                                      const ForgotPasswordScreen(),
-                                                            ),
-                                                          );
+                                                          context.go('/forgot-password');
                                                         },
                                                         child: Text(
                                                           'Forgot Password?',

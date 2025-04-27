@@ -30,3 +30,5 @@ class ForgotPasswordState extends Equatable {
   @override
   List<Object?> get props => [email, isLoading, errorMessage, isSuccess];
 }
+
+// No need to store userId in state. State should only reflect the data and status.

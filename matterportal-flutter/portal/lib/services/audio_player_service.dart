@@ -1,43 +1,26 @@
+import 'package:just_audio/just_audio.dart';
+import 'package:just_audio_background/just_audio_background.dart';
 import 'dart:async';
-import 'package:audio_service/audio_service.dart';
-
-// Static variable to hold the handler instance. Needs to be set by main.dart.
-AudioHandler? _audioHandlerInstance;
-
-// Function to set the handler instance, called from main.dart after initAudioService
-void setAudioHandlerInstance(AudioHandler handler) {
-  _audioHandlerInstance = handler;
-}
-
-// Getter to access the stored handler instance.
-// Assumes setAudioHandlerInstance has been called.
-AudioHandler get _audioHandler {
-  if (_audioHandlerInstance == null) {
-    // This should ideally not happen if initialization is correct in main.dart
-    throw StateError('AudioHandler instance has not been set. Call setAudioHandlerInstance after initializing AudioService.');
-  }
-  return _audioHandlerInstance!;
-}
+import 'package:portal/Services/storage_service.dart';
 
 class AudioPlayerService {
   static final AudioPlayerService _instance = AudioPlayerService._internal();
+  AudioPlayer player = AudioPlayer();
 
-  final StreamController<Duration?> _durationController = StreamController.broadcast();
-  final StreamController<Duration> _positionController = StreamController.broadcast();
-  final StreamController<bool> _playingController = StreamController.broadcast();
-  final StreamController<bool> _loadingController = StreamController.broadcast();
-  final StreamController<bool> _initializedController = StreamController.broadcast();
-  final StreamController<MediaItem?> _mediaItemController = StreamController.broadcast();
-
-  Duration? _duration;
-  Duration _position = Duration.zero;
-  bool _isPlaying = false;
-  bool _isLoading = false;
-  bool _isInitialized = false;
-  MediaItem? _currentMediaItem;
-
-  StreamSubscription? _playbackStateSubscription;
-  StreamSubscription? _mediaItemSubscription;
+  // State variables
+  Duration? duration;
+  Duration position = Duration.zero;
+  bool isPlaying = false;
+  bool isLoading = true;
+  bool isInitialized = false;
+  StreamController<Duration> positionController =
+      StreamController<Duration>.broadcast();
+  StreamController<bool> playingController = StreamController<bool>.broadcast();
+  StreamController<Duration?> durationController =
+      StreamController<Duration?>.broadcast();
+  StreamController<bool> loadingController = StreamController<bool>.broadcast();
+  StreamController<bool> initializedController =
+      StreamController<bool>.broadcast();
 
   factory AudioPlayerService() {
     return _instance;
@@ -47,125 +30,180 @@ class AudioPlayerService {
     _initStreams();
   }
 
-  void _initStreams() async {
-    final handler = _audioHandler;
-
-    await _playbackStateSubscription?.cancel();
-    await _mediaItemSubscription?.cancel();
-
-    _playbackStateSubscription = handler.playbackState.listen((state) {
-      _updateStateFromPlaybackState(state);
+  void _initStreams() {
+    player.positionStream.listen((pos) {
+      position = pos;
+      positionController.add(pos);
     });
 
-    _mediaItemSubscription = handler.mediaItem.listen((item) {
-      _updateStateFromMediaItem(item);
+    player.playerStateStream.listen((state) {
+      isPlaying = state.playing;
+      playingController.add(state.playing);
     });
-
-    _updateStateFromPlaybackState(handler.playbackState.value);
-    _updateStateFromMediaItem(handler.mediaItem.value);
   }
 
-  void _updateStateFromPlaybackState(PlaybackState state) {
-    final prevPosition = _position;
-    final prevIsPlaying = _isPlaying;
-    final prevIsLoading = _isLoading;
-    final prevIsInitialized = _isInitialized;
+  Future<void> initializeAudio({
+    required String? downloadUrl,
+    required String? storagePath,
+    required String fileUrl,
+    required String title,
+    required String artist,
+    String? artworkUrl,
+  }) async {
+    try {
+      isLoading = true;
+      isInitialized = false;
+      loadingController.add(true);
+      initializedController.add(false);
 
-    _position = state.updatePosition;
-    _isPlaying = state.playing;
-    _isLoading = state.processingState == AudioProcessingState.loading ||
-                      state.processingState == AudioProcessingState.buffering;
-    _isInitialized = state.processingState != AudioProcessingState.idle &&
-                          state.processingState != AudioProcessingState.error;
+      // Stop any existing playback
+      await player.stop();
+      await player.dispose();
 
-    if (_position != prevPosition) _positionController.add(_position);
-    if (_isPlaying != prevIsPlaying) _playingController.add(_isPlaying);
-    if (_isLoading != prevIsLoading) _loadingController.add(_isLoading);
-    if (_isInitialized != prevIsInitialized) _initializedController.add(_isInitialized);
-  }
+      // Create new player instance while maintaining service singleton
+      player = AudioPlayer();
+      _initStreams();
 
-  void _updateStateFromMediaItem(MediaItem? item) {
-    _currentMediaItem = item;
-    _mediaItemController.add(item);
+      duration = null;
+      position = Duration.zero;
+      durationController.add(null);
+      positionController.add(Duration.zero);
 
-    final newDuration = item?.duration;
-    if (_duration != newDuration) {
-        _duration = newDuration;
-        _durationController.add(newDuration);
+      String? audioUrl;
+
+      // First try to use the provided download URL
+      if (downloadUrl != null) {
+        print('Debug: Using provided download URL');
+        audioUrl = downloadUrl;
+      }
+      // Then try getting it from storage path
+      else if (storagePath != null) {
+        try {
+          print('Debug: Trying to get URL from storage path: $storagePath');
+          audioUrl = await st.getDownloadURL(storagePath);
+        } catch (e) {
+          print('Error getting download URL from storage path: $e');
+        }
+      }
+      // Finally, fall back to the file URL
+      else if (fileUrl.isNotEmpty) {
+        if (fileUrl.startsWith('http')) {
+          print('Debug: Using direct URL');
+          audioUrl = fileUrl;
+        } else {
+          try {
+            print('Debug: Getting download URL from fileUrl');
+            audioUrl = await st.getDownloadURL(fileUrl);
+          } catch (e) {
+            print('Error getting download URL from fileUrl: $e');
+          }
+        }
+      }
+
+      if (audioUrl == null) {
+        throw Exception('No valid audio URL found');
+      }
+
+      print('Debug: Setting audio source with URL: $audioUrl');
+
+      // Set up duration listener before setting audio source
+      var durationCompleter = Completer<Duration>();
+      var subscription = player.durationStream.listen(
+        (duration) {
+          print('Debug: Got duration update: $duration');
+          if (duration != null && !durationCompleter.isCompleted) {
+            durationCompleter.complete(duration);
+          }
+        },
+        onError: (e) {
+          print('Debug: Error in duration stream: $e');
+          if (!durationCompleter.isCompleted) {
+            durationCompleter.completeError(e);
+          }
+        },
+      );
+
+      // Set the audio source
+      await player.setAudioSource(
+        AudioSource.uri(
+          Uri.parse(audioUrl),
+          tag: MediaItem(
+            id: '1',
+            album: 'Single',
+            title: title,
+            artist: artist,
+            artUri: artworkUrl != null ? Uri.parse(artworkUrl) : null,
+          ),
+        ),
+      );
+
+      print('Debug: Audio source set successfully');
+
+      // Wait for duration with timeout
+      try {
+        duration = await durationCompleter.future.timeout(
+          const Duration(seconds: 10),
+          onTimeout: () {
+            print('Debug: Timeout waiting for duration, using default');
+            return const Duration(seconds: 0);
+          },
+        );
+        durationController.add(duration);
+        print('Debug: Duration loaded: $duration');
+      } finally {
+        subscription.cancel();
+      }
+
+      isLoading = false;
+      isInitialized = true;
+      loadingController.add(false);
+      initializedController.add(true);
+    } catch (e) {
+      print('Error initializing audio player: $e');
+      isLoading = false;
+      isInitialized = false;
+      duration = null;
+      position = Duration.zero;
+      loadingController.add(false);
+      initializedController.add(false);
+      durationController.add(null);
+      positionController.add(Duration.zero);
     }
   }
 
-  Stream<Duration?> get durationStream => _durationController.stream;
-  Stream<Duration> get positionStream => _positionController.stream;
-  Stream<bool> get playingStream => _playingController.stream;
-  Stream<bool> get loadingStream => _loadingController.stream;
-  Stream<bool> get initializedStream => _initializedController.stream;
-  Stream<MediaItem?> get mediaItemStream => _mediaItemController.stream;
-
-  Duration? get duration => _duration;
-  Duration get position => _position;
-  bool get isPlaying => _isPlaying;
-  bool get isLoading => _isLoading;
-  bool get isInitialized => _isInitialized;
-  MediaItem? get currentMediaItem => _currentMediaItem;
-
-  Future<void> loadAndPrepare({
-    required String trackId,
-    required String title,
-    required String artist,
-    String? album,
-    String? artworkUrl,
-    String? downloadUrl,
-    String? storagePath,
-    required String fileUrl,
-  }) async {
-    final handler = _audioHandler;
-    await handler.customAction('loadMediaItem', {
-        'id': trackId,
-        'title': title,
-        'artist': artist,
-        'album': album,
-        'artworkUrl': artworkUrl,
-        'downloadUrl': downloadUrl,
-        'storagePath': storagePath,
-        'fileUrl': fileUrl,
-    });
-  }
-
   Future<void> play() async {
-    final handler = _audioHandler;
-    await handler.play();
+    await player.play();
   }
 
   Future<void> pause() async {
-    final handler = _audioHandler;
-    await handler.pause();
-  }
-
-  Future<void> stop() async {
-    final handler = _audioHandler;
-    await handler.stop();
+    await player.pause();
   }
 
   Future<void> seek(Duration position) async {
-    final handler = _audioHandler;
-    await handler.seek(position);
+    await player.seek(position);
   }
 
-  void disposeStreams() {
-    _playbackStateSubscription?.cancel();
-    _mediaItemSubscription?.cancel();
-    _durationController.close();
-    _positionController.close();
-    _playingController.close();
-    _loadingController.close();
-    _initializedController.close();
-    _mediaItemController.close();
+  void dispose() {
+    player.dispose();
+    positionController.close();
+    playingController.close();
+    durationController.close();
+    loadingController.close();
+    initializedController.close();
   }
 
   Future<void> resetPlayer() async {
-    final handler = _audioHandler;
-    await handler.stop();
+    await player.stop();
+    await player.dispose();
+    player = AudioPlayer();
+    _initStreams();
+
+    // Reset all stream controllers
+    positionController.add(Duration.zero);
+    durationController.add(null);
+    loadingController.add(false);
+    initializedController.add(false);
+    playingController.add(false);
   }
 }
 
