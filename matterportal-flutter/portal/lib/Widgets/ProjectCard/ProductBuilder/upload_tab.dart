@@ -399,11 +399,18 @@ class UploadTabState extends State<UploadTab>
     List<Map<String, dynamic>> tracks,
     bool isMobile,
   ) {
-    final List<Track> typedTracks = tracks.map((map) => Track.fromMap(map)).toList();
+    final List<Track> typedTracks =
+        tracks.map((map) => Track.fromMap(map)).toList();
     // DEBUG: Check for null or duplicate UIDs
     final List<String?> uids = typedTracks.map((t) => t.uid).toList();
-    assert(uids.every((uid) => uid != null), 'One or more track.uid is null: uids = ' + uids.toString());
-    assert(uids.toSet().length == uids.length, 'Duplicate track.uid detected: uids = ' + uids.toString());
+    assert(
+      uids.every((uid) => uid != null),
+      'One or more track.uid is null: uids = ' + uids.toString(),
+    );
+    assert(
+      uids.toSet().length == uids.length,
+      'Duplicate track.uid detected: uids = ' + uids.toString(),
+    );
     debugPrint('Track UIDs for ReorderableListView: ' + uids.toString());
 
     if (typedTracks.isEmpty) {
@@ -603,6 +610,10 @@ class UploadTabState extends State<UploadTab>
         );
       }
       return;
+    }
+    // Adjust newIndex if moving down the list
+    if (newIndex > oldIndex) {
+      newIndex -= 1;
     }
     // Prepare a new order and update Firestore directly, no optimistic UI.
     final reorderedTracks = List<Map<String, dynamic>>.from(tracks);

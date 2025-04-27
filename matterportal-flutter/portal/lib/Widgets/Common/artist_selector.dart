@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:portal/Widgets/ProjectCard/text_fields.dart';
 
-class ArtistSelector extends StatelessWidget {
+class ArtistSelector extends StatefulWidget {
   final String label;
   final List<String> selectedArtists;
   final Function(List<String>) onChanged;
@@ -20,40 +20,59 @@ class ArtistSelector extends StatelessWidget {
   });
 
   @override
+  State<ArtistSelector> createState() => _ArtistSelectorState();
+}
+
+class _ArtistSelectorState extends State<ArtistSelector> {
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    print('BUILDING ARTIST SELECTOR: $label');
-    print('CURRENT ARTISTS: $selectedArtists');
+    print('BUILDING ARTIST SELECTOR: ${widget.label}');
+    print('CURRENT ARTISTS: ${widget.selectedArtists}');
 
     return buildArtistAutocomplete(
       context: context,
-      controller: TextEditingController(),
-      label: label,
+      controller: _controller,
+      label: widget.label,
       artistSuggestions: const [], // Will be populated from API
-      selectedArtists: selectedArtists,
+      selectedArtists: widget.selectedArtists,
       onArtistAdded: (artist) {
         print('ARTIST_SELECTOR - Artist Added: $artist');
-        if (!selectedArtists.contains(artist)) {
-          final updatedList = [...selectedArtists, artist];
+        if (!widget.selectedArtists.contains(artist)) {
+          final updatedList = [...widget.selectedArtists, artist];
           print('ARTIST_SELECTOR - Updated list: $updatedList');
-          onChanged(updatedList);
+          widget.onChanged(updatedList);
         }
       },
       onArtistRemoved: (artist) {
         print('ARTIST_SELECTOR - Artist Removed: $artist');
-        final updatedList = selectedArtists.where((a) => a != artist).toList();
+        final updatedList = widget.selectedArtists.where((a) => a != artist).toList();
         print('ARTIST_SELECTOR - Updated list: $updatedList');
-        onChanged(updatedList);
+        widget.onChanged(updatedList);
       },
       onArtistsReordered: (artists) {
         print('ARTIST_SELECTOR - Artists Reordered: $artists');
-        onChanged(artists);
+        widget.onChanged(artists);
       },
-      collection: collection,
-      selectedArtistIds: selectedArtistIds,
-      onArtistIdsUpdated: onArtistIdsUpdated != null
+      collection: widget.collection,
+      selectedArtistIds: widget.selectedArtistIds,
+      onArtistIdsUpdated: widget.onArtistIdsUpdated != null
           ? (ids) {
               print('ARTIST_SELECTOR - Artist IDs Updated: $ids');
-              onArtistIdsUpdated!(ids);
+              widget.onArtistIdsUpdated!(ids);
             }
           : null,
     );
