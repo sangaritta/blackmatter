@@ -30,10 +30,11 @@ class _CatalogScreenState extends State<CatalogScreen> {
   final GlobalKey<ProductsListViewState> _productsKey = GlobalKey();
   final GlobalKey<ProjectListViewState> _projectsKey = GlobalKey();
 
+  // Generates a new Project ID in the format PRTL+14 digit UID
   String _generateProjectId() {
     final random = Random();
-    final id = List.generate(12, (_) => random.nextInt(10)).join();
-    return 'CAT$id';
+    final id = List.generate(14, (_) => random.nextInt(10)).join();
+    return 'PRTL$id';
   }
 
   @override

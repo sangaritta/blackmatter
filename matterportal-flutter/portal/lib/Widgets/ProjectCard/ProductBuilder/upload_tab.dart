@@ -98,6 +98,20 @@ class UploadTabState extends State<UploadTab>
     return '${DateTime.now().microsecondsSinceEpoch}_${UniqueKey()}';
   }
 
+  void _ensureValidSelectedTrackIndex(List tracks) {
+    if (tracks.isEmpty) {
+      if (selectedTrackIndex != -1) {
+        setState(() {
+          selectedTrackIndex = -1;
+        });
+      }
+    } else if (selectedTrackIndex == -1 || selectedTrackIndex >= tracks.length) {
+      setState(() {
+        selectedTrackIndex = 0;
+      });
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -302,6 +316,7 @@ class UploadTabState extends State<UploadTab>
         print(
           '[UploadTab] _loadExistingTracks: widget.tracks after load = ${widget.tracks.length}',
         );
+        _ensureValidSelectedTrackIndex(widget.tracks);
       });
     } catch (e, stackTrace) {
       print('[UploadTab] Error loading tracks: ${e}\n${stackTrace}');
@@ -376,6 +391,15 @@ class UploadTabState extends State<UploadTab>
               return const Center(child: LoadingIndicator());
             } else if (state is TrackListLoaded) {
               final trackList = state.tracks;
+              if (mounted && trackList.isNotEmpty && (selectedTrackIndex == -1 || selectedTrackIndex >= trackList.length)) {
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (mounted) {
+                    setState(() {
+                      selectedTrackIndex = 0;
+                    });
+                  }
+                });
+              }
               return LayoutBuilder(
                 builder: (context, constraints) {
                   final isMobile = constraints.maxWidth < 700;
@@ -508,6 +532,7 @@ class UploadTabState extends State<UploadTab>
                       icon: const Icon(Icons.delete, color: Colors.red),
                       onPressed: () {
                         widget.onRemoveTrack(index);
+                        _ensureValidSelectedTrackIndex(tracks);
                       },
                     ),
                   ),
@@ -587,6 +612,7 @@ class UploadTabState extends State<UploadTab>
                       icon: const Icon(Icons.delete, color: Colors.red),
                       onPressed: () {
                         widget.onRemoveTrack(index);
+                        _ensureValidSelectedTrackIndex(tracks);
                       },
                     ),
                   ),
@@ -630,6 +656,7 @@ class UploadTabState extends State<UploadTab>
         reorderedTracks,
         // Removed onProgress: _onReorderProgress as optimistic UI/progress is not used.
       );
+      _ensureValidSelectedTrackIndex(reorderedTracks);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -671,7 +698,7 @@ class UploadTabState extends State<UploadTab>
                 padding: const EdgeInsets.symmetric(vertical: 12),
               ),
               onPressed: () {
-                _showMobileTrackEditor(context);
+                _showMobileTrackEditor(context, tracks);
               },
               child: Text(
                 'Edit ${Track.fromMap(tracks[selectedTrackIndex]).fileName}',
@@ -719,7 +746,7 @@ class UploadTabState extends State<UploadTab>
                   tracks.isNotEmpty
                       ? selectedTrackIndex != -1 &&
                               selectedTrackIndex < tracks.length
-                          ? _buildTrackEditor()
+                          ? _buildTrackEditor(tracks)
                           : const Center(
                             child: Text(
                               'Select a track to edit',
@@ -734,7 +761,7 @@ class UploadTabState extends State<UploadTab>
     );
   }
 
-  void _showMobileTrackEditor(BuildContext context) {
+  void _showMobileTrackEditor(BuildContext context, List<Map<String, dynamic>> tracks) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -782,7 +809,7 @@ class UploadTabState extends State<UploadTab>
                     controller: scrollController,
                     child: Padding(
                       padding: const EdgeInsets.all(16.0),
-                      child: _buildTrackEditor(),
+                      child: _buildTrackEditor(tracks),
                     ),
                   ),
                 ),
@@ -794,9 +821,8 @@ class UploadTabState extends State<UploadTab>
     );
   }
 
-  Widget _buildTrackEditor() {
-    if (selectedTrackIndex == -1 ||
-        selectedTrackIndex >= widget.tracks.length) {
+  Widget _buildTrackEditor(List<Map<String, dynamic>> tracks) {
+    if (selectedTrackIndex == -1 || selectedTrackIndex >= tracks.length) {
       return const Center(
         child: Text(
           'Select a track to edit',
@@ -805,8 +831,8 @@ class UploadTabState extends State<UploadTab>
       );
     }
 
-    final track = widget.tracks[selectedTrackIndex];
-    final fileUrl = fileUrls[track.fileName] ?? ''; // Get the URL for the file
+    final track = Track.fromMap(tracks[selectedTrackIndex]);
+    final fileUrl = fileUrls[track.fileName] ?? '';
 
     // Initialize all controllers for this track
     trackTitleControllers.putIfAbsent(

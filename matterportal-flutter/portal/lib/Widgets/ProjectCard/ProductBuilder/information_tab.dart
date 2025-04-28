@@ -8,6 +8,8 @@ import 'package:portal/Services/api_service.dart';
 import 'package:portal/Services/auth_service.dart';
 import 'package:portal/Widgets/Common/loading_indicator.dart';
 import 'package:portal/Widgets/Common/artist_selector.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'title_bloc.dart';
 
 // Import the component files
 import 'InformationTab/cover_image_section.dart';
@@ -39,7 +41,6 @@ class InformationTab extends StatefulWidget {
   final List<String> productTypes;
   final List<String> prices;
   final TabController tabController;
-  final Function(String) onReleaseTitleChanged;
   final Function(String) onPrimaryArtistsChanged;
   final Function(String) onProductTypeChanged;
   final String projectId;
@@ -76,7 +77,6 @@ class InformationTab extends StatefulWidget {
     required this.productTypes,
     required this.prices,
     required this.tabController,
-    required this.onReleaseTitleChanged,
     required this.onPrimaryArtistsChanged,
     required this.onProductTypeChanged,
     required this.projectId,
@@ -184,7 +184,6 @@ class InformationTabState extends State<InformationTab> {
   }
 
   void _addControllerListeners() {
-    widget.releaseTitleController.addListener(_onFieldChanged);
     widget.releaseVersionController.addListener(_onFieldChanged);
     widget.primaryArtistsController.addListener(_onFieldChanged);
     widget.upcController.addListener(_onFieldChanged);
@@ -628,13 +627,21 @@ class InformationTabState extends State<InformationTab> {
                             widget.selectedProductType ?? "Product Type",
                             style: const TextStyle(fontSize: 18, color: Colors.white),
                           ),
-                          Text(
-                            widget.releaseTitleController.text.isEmpty
-                                ? "Release Title"
-                                : "${widget.releaseTitleController.text}${widget.releaseVersionController.text.isNotEmpty ? ' (${widget.releaseVersionController.text})' : ''}",
-                            style: const TextStyle(fontSize: 24, color: Colors.white),
-                          )
-                          ,
+                          BlocBuilder<TitleBloc, TitleState>(
+                            builder: (context, state) {
+                              return TextField(
+                                controller: widget.releaseTitleController..text = state.title,
+                                onChanged: (val) {
+                                  context.read<TitleBloc>().add(TitleChanged(val));
+                                  // Optionally, trigger validation or other advanced logic here
+                                },
+                                decoration: InputDecoration(
+                                  labelText: 'Release Title',
+                                  errorText: state.isValid == false ? state.error : null,
+                                ),
+                              );
+                            },
+                          ),
                           // Artist display
                           if (widget.selectedArtists.isNotEmpty) ...[
 
@@ -658,7 +665,6 @@ class InformationTabState extends State<InformationTab> {
                             onArtistAdded: _addArtist,
                             onArtistRemoved: _removeArtist,
                             onArtistsReordered: widget.onArtistsUpdated,
-                            onReleaseTitleChanged: widget.onReleaseTitleChanged,
                             selectedMetadataLanguage: _selectedMetadataLanguage,
                             metadataLanguages: widget.metadataLanguages,
                             onMetadataLanguageChanged: (value) {
@@ -864,11 +870,20 @@ class InformationTabState extends State<InformationTab> {
                                   widget.selectedProductType ?? "Product Type",
                                   style: const TextStyle(fontSize: 18, color: Colors.white),
                                 ),
-                                Text(
-                                  widget.releaseTitleController.text.isEmpty
-                                      ? "Release Title"
-                                      : "${widget.releaseTitleController.text}${widget.releaseVersionController.text.isNotEmpty ? ' (${widget.releaseVersionController.text})' : ''}",
-                                  style: const TextStyle(fontSize: 24, color: Colors.white),
+                                BlocBuilder<TitleBloc, TitleState>(
+                                  builder: (context, state) {
+                                    return TextField(
+                                      controller: widget.releaseTitleController..text = state.title,
+                                      onChanged: (val) {
+                                        context.read<TitleBloc>().add(TitleChanged(val));
+                                        // Optionally, trigger validation or other advanced logic here
+                                      },
+                                      decoration: InputDecoration(
+                                        labelText: 'Release Title',
+                                        errorText: state.isValid == false ? state.error : null,
+                                      ),
+                                    );
+                                  },
                                 ),
                                 
 
@@ -894,7 +909,6 @@ class InformationTabState extends State<InformationTab> {
                                   onArtistAdded: _addArtist,
                                   onArtistRemoved: _removeArtist,
                                   onArtistsReordered: widget.onArtistsUpdated,
-                                  onReleaseTitleChanged: widget.onReleaseTitleChanged,
                                   selectedMetadataLanguage: _selectedMetadataLanguage,
                                   metadataLanguages: widget.metadataLanguages,
                                   onMetadataLanguageChanged: (value) {

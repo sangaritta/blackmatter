@@ -847,12 +847,11 @@ class ApiService {
       if (!productSnapshot.exists) return;
       final productData = productSnapshot.data();
       if (productData == null) return;
-      final indexRef = db
-          .collection("catalog")
-          .doc(userId)
-          .collection('allProductsIndex')
-          .doc(productId);
-      await indexRef.set(productData, SetOptions(merge: true));
+      // Update allProductsIndex as a MAP FIELD on the user's catalog document
+      final userCatalogRef = db.collection("catalog").doc(userId);
+      await userCatalogRef.set({
+        'allProductsIndex.$productId': productData
+      }, SetOptions(merge: true));
     } catch (e) {
       developer.log('Error updating allProductsIndex: $e', name: 'ApiService');
     }

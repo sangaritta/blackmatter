@@ -231,18 +231,6 @@ class _MobileProductBuilderState extends State<MobileProductBuilder>
     });
   }
 
-  void _updateInformationStatus(bool isComplete) {
-    setState(() {
-      _isInformationComplete = isComplete;
-    });
-  }
-
-  void _updateSelectedArtists(List<String> artists) {
-    setState(() {
-      selectedArtists = artists;
-    });
-  }
-
   bool _shouldShowStatusOverlay() {
     return ['Processing', 'In Review', 'Approved'].contains(productStatus);
   }
@@ -929,19 +917,26 @@ class _MobileProductBuilderState extends State<MobileProductBuilder>
                                     productTypes: productTypes,
                                     prices: prices,
                                     tabController: _tabController,
-                                    onReleaseTitleChanged: (title) {
-                                      project.updateName(title);
-                                    },
                                     onPrimaryArtistsChanged: (artists) {
-                                      project.updateArtist(artists);
+                                      setState(() {
+                                        selectedArtists = _normalizeArtistList(artists);
+                                      });
                                     },
                                     onProductTypeChanged:
                                         _handleProductTypeChange,
                                     projectId: widget.projectId,
                                     onInformationComplete:
-                                        _updateInformationStatus,
+                                        (isComplete) {
+                                      setState(() {
+                                        _isInformationComplete = isComplete;
+                                      });
+                                    },
                                     selectedArtists: selectedArtists,
-                                    onArtistsUpdated: _updateSelectedArtists,
+                                    onArtistsUpdated: (artists) {
+                                      setState(() {
+                                        selectedArtists = _normalizeArtistList(artists);
+                                      });
+                                    },
                                     selectedImageBytes: _selectedImageBytes,
                                     onImageSelected: (bytes) {
                                       setState(() {
@@ -990,6 +985,17 @@ class _MobileProductBuilderState extends State<MobileProductBuilder>
               ),
       ),
     );
+  }
+
+  // Utility function to normalize artist input to List<String>
+  List<String> _normalizeArtistList(dynamic artists) {
+    if (artists is String) {
+      return [artists];
+    } else if (artists is Iterable && artists is! String) {
+      return artists.map((e) => e.toString()).toList();
+    } else {
+      return [];
+    }
   }
 
   // Helper method to convert list to map list for roles

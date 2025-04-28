@@ -81,22 +81,23 @@ class ProjectCardState extends State<ProjectCard> {
               selectedProductType = productType;
             });
           }
-        }
 
-        _fetchAndSetArtist().then((_) {
-          if (mounted) {
-            setState(() {
-              _hasUnsavedChanges = false;
-              _originalData = _getCurrentData();
-              _isLoading = false;
-              _opacity = 1.0;
-              isProjectSaved = true; // Mark as saved for existing projects
-            });
-          }
-        });
+          _fetchAndSetArtist().then((_) {
+            if (mounted) {
+              setState(() {
+                _hasUnsavedChanges = false;
+                _originalData = _getCurrentData();
+                _isLoading = false;
+                _opacity = 1.0;
+                isProjectSaved = true; // Mark as saved for existing projects
+              });
+            }
+          });
+        }
       });
     } else {
       isEditMode = true;
+      idController.text = widget.projectId; // Ensure ID is shown for new projects
       Future.delayed(const Duration(milliseconds: 300), () {
         if (mounted) {
           setState(() {
@@ -607,36 +608,65 @@ class ProjectCardState extends State<ProjectCard> {
             children: [
               SizedBox(
                 width: 300,
-                child: ListView(
+                child: Stack(
                   children: [
-                    ListTile(
-                      title: Center(
-                        child: Text(
-                          'Project Information',
-                          style:
-                              TextStyle(color: Theme.of(context).primaryColor),
+                    ListView(
+                      children: [
+                        ListTile(
+                          title: Center(
+                            child: Text(
+                              'Project Information',
+                              style: TextStyle(color: Theme.of(context).primaryColor),
+                            ),
+                          ),
+                          onTap: () {
+                            setState(() {
+                              selectedProduct = null;
+                            });
+                          },
+                        ),
+                        if (isProjectSaved)
+                          buildAddProductButton(
+                            isProjectSaved: isProjectSaved,
+                            addProduct: addProduct,
+                          ),
+                        ...products.map((product) => ProductListTile(
+                              product: product,
+                              products: products,
+                              projectId: widget.projectId,
+                              onProductSelected: onProductSelected,
+                              productIds: productIds,
+                              isExistingProject: !widget.newProject,
+                              isNewProduct: _newProducts.contains(product),
+                            )),
+                      ],
+                    ),
+                    if (!isProjectSaved)
+                      Positioned.fill(
+                        child: IgnorePointer(
+                          ignoring: false,
+                          child: Container(
+                            color: Colors.black.withOpacity(0.7),
+                            alignment: Alignment.center,
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: const [
+                                Icon(Icons.lock_outline, color: Colors.white, size: 48),
+                                SizedBox(height: 16),
+                                Text(
+                                  'Save project information before adding products.',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                         ),
                       ),
-                      onTap: () {
-                        setState(() {
-                          selectedProduct = null;
-                        });
-                      },
-                    ),
-                    if (isProjectSaved) // Show only if the project is saved
-                      buildAddProductButton(
-                        isProjectSaved: isProjectSaved,
-                        addProduct: addProduct,
-                      ),
-                    ...products.map((product) => ProductListTile(
-                          product: product,
-                          products: products,
-                          projectId: widget.projectId,
-                          onProductSelected: onProductSelected,
-                          productIds: productIds,
-                          isExistingProject: !widget.newProject,
-                          isNewProduct: _newProducts.contains(product),
-                        )),
                   ],
                 ),
               ),
@@ -665,8 +695,7 @@ class ProjectCardState extends State<ProjectCard> {
                       title: Center(
                         child: Text(
                           'Project Information',
-                          style:
-                              TextStyle(color: Theme.of(context).primaryColor),
+                          style: TextStyle(color: Theme.of(context).primaryColor),
                         ),
                       ),
                       onTap: () {
