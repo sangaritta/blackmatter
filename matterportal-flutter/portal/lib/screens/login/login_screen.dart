@@ -1,6 +1,7 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter/foundation.dart';
 import 'package:go_router/go_router.dart';
 import 'package:portal/bloc/login/login_bloc.dart';
 import 'package:portal/bloc/login/login_event.dart';
@@ -10,6 +11,7 @@ import 'package:portal/screens/login/forgot_password_screen.dart';
 import 'package:portal/services/auth_service.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:portal/widgets/common/loading_indicator.dart';
+import 'package:portal/screens/login/open_homepage_button.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -332,6 +334,12 @@ class _LoginScreenState extends State<LoginScreen> {
                     },
                   ),
                 ),
+                if (kIsWeb)
+                  Positioned(
+                    top: 24,
+                    left: 24,
+                    child: OpenHomepageButton(),
+                  ),
               ],
             ),
           );
