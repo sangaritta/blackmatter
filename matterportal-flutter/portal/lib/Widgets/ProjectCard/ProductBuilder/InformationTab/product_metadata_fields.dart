@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:portal/Constants/fonts.dart';
 import 'package:portal/Constants/product.dart';
 import 'package:portal/Widgets/ProjectCard/text_fields.dart';
-import '../title_bloc.dart';
 
 class ProductMetadataFields extends StatelessWidget {
   final TextEditingController releaseTitleController;
@@ -56,7 +54,6 @@ class ProductMetadataFields extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Title and Version
         Row(
           children: [
             Expanded(
@@ -68,10 +65,7 @@ class ProductMetadataFields extends StatelessWidget {
             ),
           ],
         ),
-        
         const SizedBox(height: 16),
-        
-        // Language and Artists
         Row(
           children: [
             Expanded(
@@ -83,10 +77,7 @@ class ProductMetadataFields extends StatelessWidget {
             ),
           ],
         ),
-        
         const SizedBox(height: 16),
-        
-        // Genre and Subgenre
         Row(
           children: [
             Expanded(
@@ -103,39 +94,32 @@ class ProductMetadataFields extends StatelessWidget {
   }
 
   Widget _buildTitleField() {
-    return BlocBuilder<TitleBloc, TitleState>(
-      builder: (context, state) {
-        return TextField(
-          controller: releaseTitleController..text = state.title,
-          onChanged: (val) {
-            context.read<TitleBloc>().add(TitleChanged(val));
-          },
-          decoration: InputDecoration(
-            labelText: 'Release Title',
-            prefixIcon: const Icon(Icons.title, color: Colors.grey),
-            errorText: state.isValid == false ? state.error : null,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(20.0),
-              borderSide: BorderSide.none,
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(20.0),
-              borderSide: BorderSide.none,
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(20.0),
-              borderSide: BorderSide.none,
-            ),
-            filled: true,
-            fillColor: const Color(0xFF1E1B2C),
-            labelStyle: const TextStyle(
-              color: Colors.grey,
-              fontFamily: fontNameSemiBold,
-            ),
-          ),
-          style: const TextStyle(color: Colors.white),
-        );
-      },
+    return TextField(
+      controller: releaseTitleController,
+      textInputAction: TextInputAction.next,
+      decoration: InputDecoration(
+        labelText: 'Release Title',
+        prefixIcon: const Icon(Icons.title, color: Colors.grey),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(20.0),
+          borderSide: BorderSide.none,
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(20.0),
+          borderSide: BorderSide.none,
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(20.0),
+          borderSide: BorderSide.none,
+        ),
+        filled: true,
+        fillColor: const Color(0xFF1E1B2C),
+        labelStyle: const TextStyle(
+          color: Colors.grey,
+          fontFamily: fontNameSemiBold,
+        ),
+      ),
+      style: const TextStyle(color: Colors.white),
     );
   }
 

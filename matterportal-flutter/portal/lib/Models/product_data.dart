@@ -1,4 +1,6 @@
 class ProductData {
+  final String projectId;
+  final String userId;
   final String id;
   final String releaseTitle;
   final String releaseVersion;
@@ -21,6 +23,8 @@ class ProductData {
   final String state;
   final bool autoGenerateUPC;
   ProductData({
+    required this.projectId,
+    required this.userId,
     required this.id,
     required this.releaseTitle,
     required this.releaseVersion,
@@ -46,6 +50,7 @@ class ProductData {
   Map<String, dynamic> toMap() {
     return {
       'id': id,
+      'userId': userId,
       'releaseTitle': releaseTitle,
       'releaseVersion': releaseVersion,
       'primaryArtists': primaryArtists,
@@ -68,15 +73,19 @@ class ProductData {
       'autoGenerateUPC': autoGenerateUPC,
     }..removeWhere((key, value) => value == null);
   }
+
   factory ProductData.fromMap(Map<String, dynamic> map) {
     return ProductData(
+      projectId: map['projectId'],
+      userId: map['userId'],
       id: map['id'],
       releaseTitle: map['releaseTitle'],
       releaseVersion: map['releaseVersion'],
       primaryArtists: List<String>.from(map['primaryArtists']),
-      primaryArtistIds: map['primaryArtistIds'] != null
-          ? List<String>.from(map['primaryArtistIds'])
-          : null, // Extract from map
+      primaryArtistIds:
+          map['primaryArtistIds'] != null
+              ? List<String>.from(map['primaryArtistIds'])
+              : null, // Extract from map
       metadataLanguage: map['metadataLanguage'],
       genre: map['genre'],
       subgenre: map['subgenre'],

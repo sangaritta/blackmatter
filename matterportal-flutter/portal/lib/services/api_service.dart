@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'dart:async'; // Add this import for TimeoutException
 import 'dart:developer' as developer; // Import developer for logging
 import 'dart:typed_data'; // For Uint8List
+import 'dart:math'; // For min function
 import 'package:portal/Services/storage_service.dart';
 import 'package:universal_html/html.dart' as html;
 
@@ -380,7 +381,14 @@ class ApiService {
               .collection('products')
               .get();
 
-      return productDocs.docs.map((doc) => doc.data()).toList();
+      return productDocs.docs.map((doc) {
+        final data = doc.data();
+        data['id'] = doc.id;
+        if (!data.containsKey('projectId') || data['projectId'] == null) {
+          data['projectId'] = projectId;
+        }
+        return data;
+      }).toList();
     } catch (e) {
       return [];
     }
@@ -578,6 +586,9 @@ class ApiService {
           .collection('products')
           .doc(productId);
 
+      // Always include the userId field in the product data
+      productData['userId'] = userId;
+      
       // Save the product with the generated ID
       await productRef.set(productData);
 
@@ -790,13 +801,6 @@ class ApiService {
       };
 
       await productRef.set(productData);
-
-      // --- UPDATE INDEX: allProductsIndex ---
-      await _updateAllProductsIndex(
-        userId: userId,
-        projectId: projectId,
-        productId: id,
-      );
     } catch (e) {
       throw Exception('Failed to add product to project: $e');
     }
@@ -819,41 +823,16 @@ class ApiService {
       // Include the document ID in each product's data
       return productSnapshot.docs.map((doc) {
         Map<String, dynamic> data = doc.data();
-        data['id'] = doc.id; // Add the document ID to the data
+        data['id'] = doc.id; // Add the document ID
         data['type'] = data['type'] ?? ''; // Ensure type is not null
+        if (!data.containsKey('projectId') || data['projectId'] == null) {
+          data['projectId'] = projectId;
+        }
         return data;
       }).toList();
     } catch (e) {
       // Debug print
       throw Exception('Failed to fetch products for project: $e');
-    }
-  }
-
-  // Helper to update allProductsIndex after any product change
-  Future<void> _updateAllProductsIndex({
-    required String userId,
-    required String projectId,
-    required String productId,
-  }) async {
-    try {
-      final productRef = db
-          .collection("catalog")
-          .doc(userId)
-          .collection('projects')
-          .doc(projectId)
-          .collection('products')
-          .doc(productId);
-      final productSnapshot = await productRef.get();
-      if (!productSnapshot.exists) return;
-      final productData = productSnapshot.data();
-      if (productData == null) return;
-      // Update allProductsIndex as a MAP FIELD on the user's catalog document
-      final userCatalogRef = db.collection("catalog").doc(userId);
-      await userCatalogRef.set({
-        'allProductsIndex.$productId': productData
-      }, SetOptions(merge: true));
-    } catch (e) {
-      developer.log('Error updating allProductsIndex: $e', name: 'ApiService');
     }
   }
 
@@ -889,13 +868,6 @@ class ApiService {
         // If document exists, update it
         await docRef.update(productData);
       }
-
-      // --- UPDATE INDEX: allProductsIndex ---
-      await _updateAllProductsIndex(
-        userId: userId,
-        projectId: projectId,
-        productId: productId,
-      );
     } catch (e) {
       throw Exception('Failed to update product: $e');
     }
@@ -945,34 +917,7 @@ class ApiService {
       // Update the track count
       await updateProductTrackCount(userId, projectId, productId);
 
-      // --- UPDATE INDEX: allProductsIndex (track count, etc.) ---
-      final productDoc =
-          await db
-              .collection("catalog")
-              .doc(userId)
-              .collection('projects')
-              .doc(projectId)
-              .collection('products')
-              .doc(productId)
-              .get();
-      if (productDoc.exists) {
-        final productData = productDoc.data() ?? {};
-        DocumentReference<Map<String, dynamic>> indexRef = db
-            .collection("catalog")
-            .doc(userId)
-            .collection('allProductsIndex')
-            .doc(productId);
-        await indexRef.set(productData, SetOptions(merge: true));
-      }
-
       developer.log('Successfully saved track reference', name: 'ApiService');
-
-      // --- UPDATE INDEX: allProductsIndex ---
-      await _updateAllProductsIndex(
-        userId: userId,
-        projectId: projectId,
-        productId: productId,
-      );
     } catch (e) {
       developer.log('Error saving file reference: $e', name: 'ApiService');
       throw Exception('Failed to save file reference');
@@ -1115,13 +1060,6 @@ class ApiService {
         'Successfully updated track count to: ${trackSnapshot.docs.length}',
         name: 'ApiService',
       );
-
-      // --- UPDATE INDEX: allProductsIndex ---
-      await _updateAllProductsIndex(
-        userId: userId,
-        projectId: projectId,
-        productId: productId,
-      );
     } catch (e) {
       developer.log('Error saving track: $e', name: 'ApiService');
       throw Exception('Failed to save track: $e');
@@ -1174,13 +1112,6 @@ class ApiService {
           'updatedAt': FieldValue.serverTimestamp(),
         });
       }
-
-      // --- UPDATE INDEX: allProductsIndex ---
-      await _updateAllProductsIndex(
-        userId: userId,
-        projectId: projectId,
-        productId: productId,
-      );
     } catch (e) {
       //print('Error updating track count: $e');
       throw Exception('Failed to update track count');
@@ -1214,15 +1145,6 @@ class ApiService {
       if (onProgress != null) {
         onProgress(updated / tracksData.length);
       }
-    }
-    // --- UPDATE INDEX: allProductsIndex ---
-    await _updateAllProductsIndex(
-      userId: userId,
-      projectId: projectId,
-      productId: productId,
-    );
-    if (onProgress != null) {
-      onProgress(1.0);
     }
   }
 
@@ -1387,13 +1309,6 @@ class ApiService {
 
       // Commit both operations
       await batch.commit();
-
-      // --- UPDATE INDEX: allProductsIndex ---
-      await _updateAllProductsIndex(
-        userId: userId,
-        projectId: projectId,
-        productId: productId,
-      );
     } catch (e) {
       throw Exception('Failed to distribute product: $e');
     }
@@ -1582,59 +1497,6 @@ class ApiService {
     return products.where((p) => p['sellerId'] == sellerId).toList();
   }
 
-  // STREAM: Get all products for the current user (from catalog/user.uid/allProductsIndex)
-  Stream<List<Map<String, dynamic>>> productsStreamIndex({
-    String? indexKey,
-    dynamic indexValue,
-  }) {
-    final user = auth.getUser();
-    if (user == null) {
-      return const Stream.empty();
-    }
-    final userId = user.uid;
-
-    // Listen directly to the allProductsIndex map at catalog/userId/allProductsIndex
-    return db.collection("catalog").doc(userId).snapshots().map((docSnapshot) {
-      final data = docSnapshot.data();
-      if (data == null || data['allProductsIndex'] == null) {
-        return <Map<String, dynamic>>[];
-      }
-      final Map<String, dynamic> allProductsIndex = Map<String, dynamic>.from(
-        data['allProductsIndex'],
-      );
-      List<Map<String, dynamic>> products =
-          allProductsIndex.values.whereType<Map<String, dynamic>>().toList();
-      if (indexKey != null && indexValue != null) {
-        products =
-            products.where((product) {
-              return product[indexKey] == indexValue;
-            }).toList();
-      }
-      return products;
-    });
-  }
-
-  // STREAM: Get all products from the allProductsIndex collection
-  Stream<List<Map<String, dynamic>>> getProductsIndexStream() {
-    if (auth.getUser() == null) {
-      return const Stream.empty();
-    }
-    final userId = auth.getUser()!.uid;
-    return db
-        .collection("catalog")
-        .doc(userId)
-        .collection('allProductsIndex')
-        .snapshots()
-        .map(
-          (snapshot) =>
-              snapshot.docs.map((doc) {
-                final data = doc.data();
-                data['id'] = doc.id;
-                return data;
-              }).toList(),
-        );
-  }
-
   // STREAM: Get all projects for the current user
   Stream<List<Project>> getProjectsStream() {
     if (auth.getUser() == null) {
@@ -1761,23 +1623,8 @@ class ApiService {
     final userId = user.uid;
     final docSnapshot = await db.collection("catalog").doc(userId).get();
     final data = docSnapshot.data();
-    if (data == null || data['allProductsIndex'] == null) {
+    if (data == null) {
       return false;
-    }
-    final Map<String, dynamic> allProductsIndex = Map<String, dynamic>.from(
-      data['allProductsIndex'],
-    );
-    Iterable products =
-        allProductsIndex.values.whereType<Map<String, dynamic>>();
-    if (indexKey != null && indexValue != null) {
-      products = products.where((product) {
-        return product[indexKey] == indexValue;
-      });
-    }
-    for (final product in products) {
-      if (product['upc'] == upc) {
-        return true;
-      }
     }
     return false;
   }
@@ -1841,7 +1688,6 @@ class ApiService {
     }).toList();
   }
 
-  /// Restored: Get a product object (placeholder, implement as needed)
   Future<Map<String, dynamic>?> getProductObject(
     String userId,
     String projectId,
@@ -1858,7 +1704,12 @@ class ApiService {
             .get();
     if (doc.exists) {
       final data = doc.data();
-      data?['id'] = doc.id;
+      if (data != null) {
+        data['id'] = doc.id;
+        if (!data.containsKey('projectId') || data['projectId'] == null) {
+          data['projectId'] = projectId;
+        }
+      }
       return data;
     }
     return null;
@@ -1976,7 +1827,14 @@ class ApiService {
               .doc(productId)
               .get();
       if (doc.exists) {
-        return doc.data();
+        final data = doc.data();
+        if (data != null) {
+          if (!data.containsKey('projectId') || data['projectId'] == null) {
+            data['projectId'] = projectId;
+          }
+          data['id'] = doc.id;
+        }
+        return data;
       }
       return null;
     } catch (e) {
@@ -2100,6 +1958,7 @@ class ApiService {
     List<String> primaryArtists = const [],
     String genre = '',
     String artworkUrl = '',
+    void Function(double)? onProgress,
   }) async {
     try {
       // 1. Read file bytes using FileReader (universal_html compatible)
@@ -2109,66 +1968,109 @@ class ApiService {
         completer.complete(reader.result as Uint8List);
       });
       reader.readAsArrayBuffer(file);
-      final uint8list = await completer.future;
-      // 2. Generate a new trackId
-      final trackId =
-          db
-              .collection('catalog')
-              .doc(userId)
-              .collection('projects')
-              .doc(projectId)
-              .collection('products')
-              .doc(productId)
-              .collection('tracks')
-              .doc()
-              .id;
-      // 3. Get storage path
-      final storagePath = getAudioUploadPath(
+      final bytes = await completer.future;
+      final trackId = generateTrackId();
+      final fileName = file.name;
+      // 2. Upload WAV to correct catalog path
+      final uploadResult = await st.uploadAudioTrackFromBytes(
+        bytes,
         userId,
         projectId,
         productId,
         trackId,
-      );
-      // 4. Upload file to storage
-      final uploadResult = await st.uploadFileFromBytes(
-        uint8list,
-        storagePath,
-        (progress) {},
-        mimeType: 'audio/wav',
+        fileName,
+        (progress) {
+          if (onProgress != null) onProgress(progress);
+        },
       );
       final downloadUrl = uploadResult['url'] ?? '';
-      // 5. Determine next track number
-      final tracksSnapshot =
-          await db
-              .collection('catalog')
-              .doc(userId)
-              .collection('projects')
-              .doc(projectId)
-              .collection('products')
-              .doc(productId)
-              .collection('tracks')
-              .get();
-      final trackNumber = tracksSnapshot.docs.length + 1;
-      // 6. Prepare track data
-      final trackData = {
-        'trackNumber': trackNumber,
-        'title': file.name.replaceAll('.wav', ''),
-        'fileName': file.name,
+
+      // Compose track data
+      final Map<String, dynamic> trackData = {
+        'title': fileName,
         'primaryArtists': primaryArtists,
         'genre': genre,
         'artworkUrl': artworkUrl,
         'downloadUrl': downloadUrl,
-        'storagePath': storagePath,
-        'uid': trackId,
         'createdAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
+        'uid': trackId,
+        // Add more fields as needed
       };
-      // 7. Save track in Firestore
-      await saveTrack(userId, projectId, productId, trackId, trackData);
+
+      // Save the track to Firestore
+      await saveTrack(
+        userId,
+        projectId,
+        productId,
+        trackId,
+        trackData,
+      );
     } catch (e) {
       developer.log('Error uploading track: $e', name: 'ApiService');
       rethrow;
     }
+  }
+
+  /// Stream all products using Firestore collection group query
+  Stream<List<Map<String, dynamic>>> productsStreamCollectionGroup() {
+    return db.collectionGroup('products').snapshots().map((query) =>
+      query.docs.map((doc) {
+        final data = doc.data();
+        data['id'] = doc.id;
+        return data;
+      }).toList()
+    );
+  }
+  
+  /// Stream all products belonging to the current user using collection group query with userId filter
+  Stream<List<Map<String, dynamic>>> getUserProductsStream() {
+    if (auth.getUser() == null) {
+      developer.log('No authenticated user found', name: 'ApiService.getUserProductsStream');
+      return const Stream.empty();
+    }
+    
+    final userId = auth.getUser()!.uid;
+    developer.log('Getting products for user ID: $userId', name: 'ApiService.getUserProductsStream');
+    
+    return db
+        .collectionGroup('products')
+        .where('userId', isEqualTo: userId)
+        .snapshots()
+        .map((query) {
+          developer.log('Query returned ${query.docs.length} products', name: 'ApiService.getUserProductsStream');
+          
+          // For debugging, log the first few products if any
+          if (query.docs.isNotEmpty) {
+            for (var i = 0; i < min(3, query.docs.length); i++) {
+              final doc = query.docs[i];
+              developer.log('Product ${i+1}: ID=${doc.id}, projectId=${doc.data()['projectId'] ?? 'missing'}, userId=${doc.data()['userId'] ?? 'missing'}', 
+                  name: 'ApiService.getUserProductsStream');
+            }
+          }
+          
+          return query.docs.map((doc) {
+            final data = doc.data();
+            data['id'] = doc.id;
+            data['userId'] = userId;
+            // Ensure projectId is present
+            String? extractedProjectId;
+            final pathSegments = doc.reference.path.split('/');
+            final projectsIndex = pathSegments.indexOf('projects');
+            if (!data.containsKey('projectId') || data['projectId'] == null) {
+              if (projectsIndex != -1 && projectsIndex + 1 < pathSegments.length) {
+                extractedProjectId = pathSegments[projectsIndex + 1];
+                data['projectId'] = extractedProjectId;
+              }
+            }
+            developer.log('[getUserProductsStream] doc.path=${doc.reference.path}, extractedProjectId=$extractedProjectId, finalProjectId=${data['projectId']}', name: 'ApiService.getUserProductsStream');
+            return data;
+          }).toList();
+        });
+  }
+
+  String generateTrackId() {
+    return db.collection('catalog').doc().id;
   }
 }
 

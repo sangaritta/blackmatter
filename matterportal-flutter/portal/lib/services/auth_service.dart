@@ -305,7 +305,7 @@ class AuthenticationService {
     }
   }
 
-  // Modify the signOut method to update the auth state
+  // Modified signOut method to ensure complete logout
   Future<void> signOut() async {
     try {
       User? currentUser = _fireAuth.currentUser;
@@ -314,18 +314,34 @@ class AuthenticationService {
         String? currentSessionId = await _getCurrentSessionId();
 
         if (currentSessionId != null) {
-          await _firestore
-              .collection('user_sessions')
-              .doc(currentUser.uid)
-              .collection('sessions')
-              .doc(currentSessionId)
-              .update({'isValid': false});
+          try {
+            await _firestore
+                .collection('user_sessions')
+                .doc(currentUser.uid)
+                .collection('sessions')
+                .doc(currentSessionId)
+                .update({'isValid': false});
+          } catch (e) {
+            debugPrint('Error updating session: $e');
+            // Continue with logout even if Firestore update fails
+          }
         }
       }
-      // Sign out the user
+      
+      // Sign out from Firebase Auth
+      await _fireAuth.signOut();
+      
+      // Ensure we notify listeners about the state change
+      _authStateController.add(false);
+      
+      // Clear any cached data
+      await _secureStorage.delete(key: 'sessionId');
+      await _secureStorage.delete(key: 'sessionExpiry');
+    } catch (e) {
+      debugPrint('Error during sign out: $e');
+      // Still try to sign out even if an error occurs
       _fireAuth.signOut();
       _authStateController.add(false);
-    } catch (e) {
       rethrow;
     }
   }

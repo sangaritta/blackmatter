@@ -101,16 +101,23 @@ class _MobileProjectViewState extends State<MobileProjectView> {
     setState(() {
       _isLoading = true;
     });
-
     try {
       // Load products for this project
       if (!widget.newProject) {
-        final userId = auth.getUser()!.uid;
+        final userId = auth.getUser()?.uid;
+        if (userId == null || widget.projectId.isEmpty) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Error: Missing user or project ID')),
+            );
+          }
+          setState(() { _isLoading = false; });
+          return;
+        }
         _products = await api.getProductsByProjectId(userId, widget.projectId);
       }
-
       // If initialProductId is provided, navigate to that product immediately
-      if (widget.initialProductId != null && !widget.newProject) {
+      if (widget.initialProductId != null && widget.initialProductId!.isNotEmpty && !widget.newProject) {
         _navigateToProduct(widget.initialProductId!);
       }
     } catch (e) {
@@ -168,7 +175,16 @@ class _MobileProjectViewState extends State<MobileProjectView> {
     });
 
     try {
-      final userId = auth.getUser()!.uid;
+      final userId = auth.getUser()?.uid;
+      if (userId == null || widget.projectId.isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Error: Missing user or project ID')),
+          );
+        }
+        setState(() { _isSaving = false; });
+        return;
+      }
 
       final updatedProject = {
         'projectName': _nameController.text,
@@ -249,7 +265,16 @@ class _MobileProjectViewState extends State<MobileProjectView> {
     });
 
     try {
-      final userId = auth.getUser()!.uid;
+      final userId = auth.getUser()?.uid;
+      if (userId == null || widget.projectId.isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Error: Missing user or project ID')),
+          );
+        }
+        setState(() { _isLoading = false; });
+        return;
+      }
       _products = await api.getProductsByProjectId(userId, widget.projectId);
     } catch (e) {
       if (mounted) {

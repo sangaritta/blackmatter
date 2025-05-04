@@ -2,7 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:portal/Models/project.dart';
-import 'package:portal/Screens/Home/import_releases_screen.dart'; // Add this import
+import 'package:portal/Screens/Home/import_releases_screen.dart'; // Add this importimport 'package:portal/Screens/Home/products_list_view.dart';
 import 'package:portal/Screens/Home/products_list_view.dart';
 import 'package:portal/Screens/Home/project_list_view.dart';
 import 'package:portal/Screens/Home/responsive_project_view.dart';
@@ -88,7 +88,9 @@ class _CatalogScreenState extends State<CatalogScreen> {
                             MediaQuery.of(context).size.width > 600;
 
                         return ResponsiveProjectView(
+                          productUPC: '',
                           projectId: newProjectId,
+                          initialProductId: newProjectId,
 
                           newProject: true,
                           useDesktopUI:

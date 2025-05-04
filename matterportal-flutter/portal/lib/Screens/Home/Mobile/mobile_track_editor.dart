@@ -186,7 +186,6 @@ class _MobileTrackEditorState extends State<MobileTrackEditor> {
     // Reinitialize the audio player with new track
     await _audioPlayer.initializeAudio(
       downloadUrl: widget.track['downloadUrl'],
-      storagePath: widget.track['storagePath'],
       fileUrl: widget.fileUrl,
       title: _formatTitle(),
       artist: _formatArtists(),

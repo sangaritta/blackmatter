@@ -97,7 +97,8 @@ class ProjectCardState extends State<ProjectCard> {
       });
     } else {
       isEditMode = true;
-      idController.text = widget.projectId; // Ensure ID is shown for new projects
+      idController.text =
+          widget.projectId; // Ensure ID is shown for new projects
       Future.delayed(const Duration(milliseconds: 300), () {
         if (mounted) {
           setState(() {
@@ -187,8 +188,8 @@ class ProjectCardState extends State<ProjectCard> {
   Future<void> _fetchProducts() async {
     try {
       String userId = auth.getUser()!.uid;
-      List<Map<String, dynamic>> fetchedProducts =
-          await api.getProductsForProject(userId, widget.projectId);
+      List<Map<String, dynamic>> fetchedProducts = await api
+          .getProductsForProject(userId, widget.projectId);
 
       setState(() {
         products.clear();
@@ -226,14 +227,6 @@ class ProjectCardState extends State<ProjectCard> {
       selectedProduct = productType;
       selectedProductType = productType;
       _newProducts.add(productType);
-
-      // Debug the state
-      print('Added new product:');
-      print('Type: $productType');
-      print('ID: $productId');
-      print('All products: $products');
-      print('Product IDs: $productIds');
-      print('New products: $_newProducts');
     });
 
     return productId;
@@ -354,7 +347,7 @@ class ProjectCardState extends State<ProjectCard> {
                   ),
                 ),
                 const SizedBox(height: 16),
-                _buildSaveButton()
+                _buildSaveButton(),
               ],
             ),
           ),
@@ -371,41 +364,39 @@ class ProjectCardState extends State<ProjectCard> {
   }
 
   Widget _buildSaveButton() {
-    bool canSave = projectNameController.text.trim().isNotEmpty &&
+    bool canSave =
+        projectNameController.text.trim().isNotEmpty &&
         artistNameController.text.trim().isNotEmpty &&
         idController.text.trim().isNotEmpty &&
         _hasUnsavedChanges;
 
     if (isSaving) {
       return const Center(
-        child: LoadingIndicator(
-          size: 50,
-          color: Colors.white,
-        ),
+        child: LoadingIndicator(size: 50, color: Colors.white),
       );
     }
 
     return Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(8),
-        boxShadow: canSave
-            ? [
-                BoxShadow(
-                  color: const Color(0xFF9D6BFF).withOpacity(0.2),
-                  blurRadius: 12,
-                  offset: const Offset(0, 6),
-                ),
-              ]
-            : [],
+        boxShadow:
+            canSave
+                ? [
+                  BoxShadow(
+                    color: const Color(0xFF9D6BFF).withOpacity(0.2),
+                    blurRadius: 12,
+                    offset: const Offset(0, 6),
+                  ),
+                ]
+                : [],
       ),
       child: ElevatedButton(
         onPressed: canSave ? _saveProject : null,
         style: ElevatedButton.styleFrom(
-          backgroundColor: canSave ? const Color(0xFF9D6BFF) : const Color(0xFF2D2D3A),
+          backgroundColor:
+              canSave ? const Color(0xFF9D6BFF) : const Color(0xFF2D2D3A),
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
-          ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         ),
         child: Text(
           !widget.newProject ? 'Update' : 'Save',
@@ -425,7 +416,8 @@ class ProjectCardState extends State<ProjectCard> {
         artistNameController.text.isEmpty ||
         idController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please fill in all required fields')));
+        const SnackBar(content: Text('Please fill in all required fields')),
+      );
       return;
     }
 
@@ -447,7 +439,8 @@ class ProjectCardState extends State<ProjectCard> {
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Project created successfully')));
+            const SnackBar(content: Text('Project created successfully')),
+          );
         }
 
         setState(() {
@@ -461,7 +454,8 @@ class ProjectCardState extends State<ProjectCard> {
         });
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Failed to create project')));
+            const SnackBar(content: Text('Failed to create project')),
+          );
         }
       }
     } else {
@@ -482,7 +476,8 @@ class ProjectCardState extends State<ProjectCard> {
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Project updated successfully')));
+            const SnackBar(content: Text('Project updated successfully')),
+          );
         }
 
         setState(() {
@@ -495,7 +490,8 @@ class ProjectCardState extends State<ProjectCard> {
         });
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Failed to update project')));
+            const SnackBar(content: Text('Failed to update project')),
+          );
         }
       }
     }
@@ -504,8 +500,10 @@ class ProjectCardState extends State<ProjectCard> {
   Future<void> _fetchAndSetArtist() async {
     try {
       String userId = auth.getUser()!.uid;
-      String? artistName =
-          await api.getArtistByProjectId(userId, widget.projectId);
+      String? artistName = await api.getArtistByProjectId(
+        userId,
+        widget.projectId,
+      );
       setState(() {
         artistNameController.text = artistName!;
       });
@@ -532,10 +530,7 @@ class ProjectCardState extends State<ProjectCard> {
               duration: const Duration(milliseconds: 500),
               curve: Curves.easeInOut,
               child: const Center(
-                child: LoadingIndicator(
-                  size: 50,
-                  color: Colors.white,
-                ),
+                child: LoadingIndicator(size: 50, color: Colors.white),
               ),
             ),
         ],
@@ -584,10 +579,7 @@ class ProjectCardState extends State<ProjectCard> {
                     duration: const Duration(milliseconds: 500),
                     curve: Curves.easeInOut,
                     child: const Center(
-                      child: LoadingIndicator(
-                        size: 50,
-                        color: Colors.white,
-                      ),
+                      child: LoadingIndicator(size: 50, color: Colors.white),
                     ),
                   ),
               ],
@@ -616,7 +608,9 @@ class ProjectCardState extends State<ProjectCard> {
                           title: Center(
                             child: Text(
                               'Project Information',
-                              style: TextStyle(color: Theme.of(context).primaryColor),
+                              style: TextStyle(
+                                color: Theme.of(context).primaryColor,
+                              ),
                             ),
                           ),
                           onTap: () {
@@ -630,15 +624,17 @@ class ProjectCardState extends State<ProjectCard> {
                             isProjectSaved: isProjectSaved,
                             addProduct: addProduct,
                           ),
-                        ...products.map((product) => ProductListTile(
-                              product: product,
-                              products: products,
-                              projectId: widget.projectId,
-                              onProductSelected: onProductSelected,
-                              productIds: productIds,
-                              isExistingProject: !widget.newProject,
-                              isNewProduct: _newProducts.contains(product),
-                            )),
+                        ...products.map(
+                          (product) => ProductListTile(
+                            product: product,
+                            products: products,
+                            projectId: widget.projectId,
+                            onProductSelected: onProductSelected,
+                            productIds: productIds,
+                            isExistingProject: !widget.newProject,
+                            isNewProduct: _newProducts.contains(product),
+                          ),
+                        ),
                       ],
                     ),
                     if (!isProjectSaved)
@@ -651,7 +647,11 @@ class ProjectCardState extends State<ProjectCard> {
                             child: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: const [
-                                Icon(Icons.lock_outline, color: Colors.white, size: 48),
+                                Icon(
+                                  Icons.lock_outline,
+                                  color: Colors.white,
+                                  size: 48,
+                                ),
                                 SizedBox(height: 16),
                                 Text(
                                   'Save project information before adding products.',
@@ -671,7 +671,7 @@ class ProjectCardState extends State<ProjectCard> {
                 ),
               ),
               const VerticalDivider(color: Colors.black),
-              cardBody()
+              cardBody(),
             ],
           ),
         ),
@@ -695,7 +695,9 @@ class ProjectCardState extends State<ProjectCard> {
                       title: Center(
                         child: Text(
                           'Project Information',
-                          style: TextStyle(color: Theme.of(context).primaryColor),
+                          style: TextStyle(
+                            color: Theme.of(context).primaryColor,
+                          ),
                         ),
                       ),
                       onTap: () {
@@ -708,20 +710,22 @@ class ProjectCardState extends State<ProjectCard> {
                       isProjectSaved: true,
                       addProduct: addProduct,
                     ),
-                    ...products.map((product) => ProductListTile(
-                          product: product,
-                          products: products,
-                          projectId: widget.projectId,
-                          onProductSelected: onProductSelected,
-                          productIds: productIds,
-                          isExistingProject: !widget.newProject,
-                          isNewProduct: _newProducts.contains(product),
-                        )),
+                    ...products.map(
+                      (product) => ProductListTile(
+                        product: product,
+                        products: products,
+                        projectId: widget.projectId,
+                        onProductSelected: onProductSelected,
+                        productIds: productIds,
+                        isExistingProject: !widget.newProject,
+                        isNewProduct: _newProducts.contains(product),
+                      ),
+                    ),
                   ],
                 ),
               ),
               const VerticalDivider(color: Colors.black),
-              cardBody()
+              cardBody(),
             ],
           ),
         ),

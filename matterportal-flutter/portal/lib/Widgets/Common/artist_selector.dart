@@ -8,6 +8,7 @@ class ArtistSelector extends StatefulWidget {
   final String collection;
   final List<String>? selectedArtistIds;
   final Function(List<String>)? onArtistIdsUpdated;
+  final Widget? prefixIcon;
 
   const ArtistSelector({
     required this.label,
@@ -16,6 +17,7 @@ class ArtistSelector extends StatefulWidget {
     required this.collection,
     this.selectedArtistIds,
     this.onArtistIdsUpdated,
+    this.prefixIcon,
     super.key,
   });
 
@@ -40,9 +42,6 @@ class _ArtistSelectorState extends State<ArtistSelector> {
 
   @override
   Widget build(BuildContext context) {
-    print('BUILDING ARTIST SELECTOR: ${widget.label}');
-    print('CURRENT ARTISTS: ${widget.selectedArtists}');
-
     return buildArtistAutocomplete(
       context: context,
       controller: _controller,
@@ -50,31 +49,28 @@ class _ArtistSelectorState extends State<ArtistSelector> {
       artistSuggestions: const [], // Will be populated from API
       selectedArtists: widget.selectedArtists,
       onArtistAdded: (artist) {
-        print('ARTIST_SELECTOR - Artist Added: $artist');
         if (!widget.selectedArtists.contains(artist)) {
           final updatedList = [...widget.selectedArtists, artist];
-          print('ARTIST_SELECTOR - Updated list: $updatedList');
           widget.onChanged(updatedList);
         }
       },
       onArtistRemoved: (artist) {
-        print('ARTIST_SELECTOR - Artist Removed: $artist');
-        final updatedList = widget.selectedArtists.where((a) => a != artist).toList();
-        print('ARTIST_SELECTOR - Updated list: $updatedList');
+        final updatedList =
+            widget.selectedArtists.where((a) => a != artist).toList();
         widget.onChanged(updatedList);
       },
       onArtistsReordered: (artists) {
-        print('ARTIST_SELECTOR - Artists Reordered: $artists');
         widget.onChanged(artists);
       },
       collection: widget.collection,
       selectedArtistIds: widget.selectedArtistIds,
-      onArtistIdsUpdated: widget.onArtistIdsUpdated != null
-          ? (ids) {
-              print('ARTIST_SELECTOR - Artist IDs Updated: $ids');
-              widget.onArtistIdsUpdated!(ids);
-            }
-          : null,
+      onArtistIdsUpdated:
+          widget.onArtistIdsUpdated != null
+              ? (ids) {
+                widget.onArtistIdsUpdated!(ids);
+              }
+              : null,
+      prefixIcon: widget.prefixIcon,
     );
   }
 }

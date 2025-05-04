@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:portal/Services/audio_player_service.dart';
+import 'package:portal/Widgets/Common/loading_indicator.dart';
 
 class AudioPreview extends StatefulWidget {
   final String fileName;
@@ -67,18 +68,18 @@ class _AudioPreviewState extends State<AudioPreview> {
       return const Center(
         child: Padding(
           padding: EdgeInsets.symmetric(vertical: 8.0),
-          child: CircularProgressIndicator(),
+          child: LoadingIndicator(size: 32),
         ),
       );
     }
 
-    if (!widget.isInitialized) {
+    if (!widget.isInitialized && !widget.isLoading) {
       return const Center(
         child: Padding(
           padding: EdgeInsets.symmetric(vertical: 8.0),
           child: Text(
-            'Audio preview not available',
-            style: TextStyle(color: Colors.grey),
+            'Audio preview failed to load. Please check the file URL or try re-uploading.',
+            style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold),
           ),
         ),
       );
@@ -150,31 +151,19 @@ class _AudioPreviewState extends State<AudioPreview> {
                   height: 48,
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(4),
-                    color: const Color(0xFF1E1B2C),
-                  ),
-                  child: widget.artworkUrl != null
-                      ? ClipRRect(
-                          borderRadius: BorderRadius.circular(4),
-                          child: Image.network(
-                            widget.artworkUrl!,
+                    image: widget.artworkUrl != null && widget.artworkUrl!.isNotEmpty
+                        ? DecorationImage(
+                            image: NetworkImage(widget.artworkUrl!),
                             fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) =>
-                                const Icon(
-                              Icons.album,
-                              color: Colors.grey,
-                              size: 24,
-                            ),
-                          ),
-                        )
-                      : const Icon(
-                          Icons.album,
-                          color: Colors.grey,
-                          size: 24,
-                        ),
+                          )
+                        : null,
+                    color: Colors.grey[900],
+                  ),
+                  child: widget.artworkUrl == null || widget.artworkUrl!.isEmpty
+                      ? const Icon(Icons.music_note, color: Colors.white54)
+                      : null,
                 ),
-                const SizedBox(width: 16),
-
-                // Track info
+                const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -200,8 +189,6 @@ class _AudioPreviewState extends State<AudioPreview> {
                     ],
                   ),
                 ),
-
-                // Duration
                 Text(
                   _formatDuration(widget.duration),
                   style: TextStyle(

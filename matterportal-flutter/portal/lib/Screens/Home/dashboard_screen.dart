@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:portal/Models/project.dart';
 import 'package:portal/Services/api_service.dart';
-import 'package:portal/main.dart';
 import 'package:portal/Screens/Home/catalog_screen.dart';
 import 'package:portal/Screens/Home/products_list_view.dart';
 import 'package:portal/Screens/Home/Tabs/artists_tab.dart';
@@ -165,7 +164,9 @@ class _ProjectsSummaryCard extends StatelessWidget {
         return Card(
           elevation: 10,
           color: const Color(0xFF232040),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(28),
+          ),
           child: ConstrainedBox(
             constraints: const BoxConstraints(minHeight: 220, maxHeight: 340),
             child: StreamBuilder<List<Project>>(
@@ -182,7 +183,11 @@ class _ProjectsSummaryCard extends StatelessWidget {
                           CircleAvatar(
                             backgroundColor: Colors.blue[200],
                             radius: 24,
-                            child: Icon(Icons.library_music_outlined, color: Colors.white, size: 28),
+                            child: Icon(
+                              Icons.library_music_outlined,
+                              color: Colors.white,
+                              size: 28,
+                            ),
                           ),
                           const SizedBox(width: 16),
                           const Text(
@@ -214,7 +219,10 @@ class _ProjectsSummaryCard extends StatelessWidget {
                             backgroundColor: Colors.blue[100]?.withOpacity(0.2),
                             label: Text(
                               projects[i].name,
-                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w500,
+                              ),
                               overflow: TextOverflow.ellipsis,
                               maxLines: 1,
                             ),
@@ -231,7 +239,9 @@ class _ProjectsSummaryCard extends StatelessWidget {
                             backgroundColor: Colors.blue[400],
                             foregroundColor: Colors.white,
                             minimumSize: const Size(120, 44),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
                           ),
                           icon: const Icon(Icons.arrow_forward),
                           label: const Text('View All'),
@@ -268,73 +278,56 @@ class _ProductsSummaryCard extends StatelessWidget {
         return Card(
           elevation: 10,
           color: const Color(0xFF232040),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(28),
+          ),
           child: ConstrainedBox(
             constraints: const BoxConstraints(minHeight: 220, maxHeight: 340),
             child: StreamBuilder<List<Map<String, dynamic>>>(
-              stream: api.productsStreamIndex(),
+              stream: api.getUserProductsStream(),
               builder: (context, snapshot) {
                 final products = snapshot.data ?? [];
                 return Padding(
-                  padding: const EdgeInsets.all(28),
+                  padding: const EdgeInsets.all(16.0),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      Text(
+                        'Products',
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
                       Row(
                         children: [
-                          CircleAvatar(
-                            backgroundColor: Colors.purple[200],
-                            radius: 24,
-                            child: Icon(Icons.album, color: Colors.white, size: 28),
-                          ),
-                          const SizedBox(width: 16),
-                          const Text(
-                            'Products',
-                            style: TextStyle(
+                          Text(
+                            products.length.toString(),
+                            style: Theme.of(
+                              context,
+                            ).textTheme.headlineMedium?.copyWith(
                               color: Colors.white,
-                              fontSize: 24,
                               fontWeight: FontWeight.bold,
-                              letterSpacing: 0.2,
                             ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Total',
+                            style: Theme.of(context).textTheme.bodyLarge
+                                ?.copyWith(color: Colors.white70),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 18),
-                      Text(
-                        '${products.length}',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 44,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 0.2,
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      _DashboardPreviewList(
-                        children: List.generate(
-                          products.length > 3 ? 3 : products.length,
-                          (i) => Chip(
-                            backgroundColor: Colors.purple[100]?.withOpacity(0.2),
-                            label: Text(
-                              products[i]['releaseTitle'] ?? 'No title',
-                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500),
-                              overflow: TextOverflow.ellipsis,
-                              maxLines: 1,
-                            ),
-                          ),
-                        ),
-                        totalCount: products.length,
-                        moreLabel: 'more',
-                      ),
                       const Spacer(),
                       Align(
-                        alignment: Alignment.bottomRight,
+                        alignment: Alignment.centerRight,
                         child: ElevatedButton.icon(
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.purple[400],
-                            foregroundColor: Colors.white,
-                            minimumSize: const Size(120, 44),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            backgroundColor: const Color(0xFF9C27B0),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
                           ),
                           icon: const Icon(Icons.arrow_forward),
                           label: const Text('View All'),
@@ -371,7 +364,9 @@ class _ArtistsSummaryCard extends StatelessWidget {
         return Card(
           elevation: 10,
           color: const Color(0xFF232040),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(28),
+          ),
           child: ConstrainedBox(
             constraints: const BoxConstraints(minHeight: 220, maxHeight: 340),
             child: StreamBuilder<List<Map<String, dynamic>>>(
@@ -388,7 +383,11 @@ class _ArtistsSummaryCard extends StatelessWidget {
                           CircleAvatar(
                             backgroundColor: Colors.green[200],
                             radius: 24,
-                            child: Icon(Icons.person, color: Colors.white, size: 28),
+                            child: Icon(
+                              Icons.person,
+                              color: Colors.white,
+                              size: 28,
+                            ),
                           ),
                           const SizedBox(width: 16),
                           const Text(
@@ -417,10 +416,15 @@ class _ArtistsSummaryCard extends StatelessWidget {
                         children: List.generate(
                           artists.length > 3 ? 3 : artists.length,
                           (i) => Chip(
-                            backgroundColor: Colors.green[100]?.withOpacity(0.2),
+                            backgroundColor: Colors.green[100]?.withOpacity(
+                              0.2,
+                            ),
                             label: Text(
                               artists[i]['artistName'] ?? 'No name',
-                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w500,
+                              ),
                               overflow: TextOverflow.ellipsis,
                               maxLines: 1,
                             ),
@@ -437,7 +441,9 @@ class _ArtistsSummaryCard extends StatelessWidget {
                             backgroundColor: Colors.green[400],
                             foregroundColor: Colors.white,
                             minimumSize: const Size(120, 44),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
                           ),
                           icon: const Icon(Icons.arrow_forward),
                           label: const Text('View All'),

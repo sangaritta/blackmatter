@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:portal/Models/project.dart';
 import 'package:portal/Screens/Home/project_view.dart';
-import 'package:portal/Screens/Home/Mobile/mobile_project_view.dart'; // Import mobile view
 import 'package:portal/Screens/Home/responsive_project_view.dart';
 import 'package:portal/Services/api_service.dart';
 import 'package:portal/Widgets/Common/loading_indicator.dart';
@@ -29,21 +28,35 @@ class ProjectListViewState extends State<ProjectListView> {
     }
     try {
       if (mounted) {
+        // Defensive: get upc and products safely from the first product (not from project)
+        final productsList = (project as dynamic).products ?? [];
+        String upc = '';
+        String initialProductId = '';
+        if (productsList is List && productsList.isNotEmpty) {
+          final firstProduct = productsList.first;
+          if (firstProduct != null) {
+            upc = (firstProduct as dynamic).upc ?? '';
+            initialProductId = (firstProduct as dynamic).id ?? '';
+          }
+        }
+        debugPrint('[ProjectListView] Navigating to ResponsiveProjectView with projectId: ${project.id}, upc: $upc, initialProductId: $initialProductId');
         Navigator.of(context).push(
           MaterialPageRoute(
-            builder:
-                (context) => ResponsiveProjectView(
-                  projectId: project.id,
-                  newProject: false,
-                ),
+            builder: (context) => ResponsiveProjectView(
+              projectId: project.id,
+              newProject: false,
+              productUPC: upc,
+              initialProductId: initialProductId.isEmpty ? '' : initialProductId,
+            ),
           ),
         );
       }
     } catch (e) {
+      debugPrint('[ProjectListView] Navigation error: $e');
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error opening project: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error opening project: $e')),
+        );
       }
     }
   }

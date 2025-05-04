@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:portal/Models/track.dart';
 import 'package:portal/Models/product.dart';
 import 'package:portal/Models/project.dart';
+import 'package:portal/Services/auth_service.dart';
 
 class SpotifyService {
   // Using the existing client credentials from the music_verification_service
@@ -38,7 +39,8 @@ class SpotifyService {
 
     final response = await http.get(
       Uri.parse(
-          'https://api.spotify.com/v1/search?q=$artistName&type=artist&limit=5'),
+        'https://api.spotify.com/v1/search?q=$artistName&type=artist&limit=5',
+      ),
       headers: {'Authorization': 'Bearer $accessToken'},
     );
 
@@ -54,7 +56,8 @@ class SpotifyService {
 
     final response = await http.get(
       Uri.parse(
-          'https://api.spotify.com/v1/artists/$artistId/albums?include_groups=album,single,compilation&limit=50'),
+        'https://api.spotify.com/v1/artists/$artistId/albums?include_groups=album,single,compilation&limit=50',
+      ),
       headers: {'Authorization': 'Bearer $accessToken'},
     );
 
@@ -100,9 +103,10 @@ class SpotifyService {
     final tracksData = albumData['tracks']['items'] as List;
     final releaseDate = albumData['release_date'] ?? '';
     final albumType = albumData['album_type'] ?? 'album';
-    final releaseYear = releaseDate.isNotEmpty
-        ? releaseDate.split('-')[0]
-        : DateTime.now().year.toString();
+    final releaseYear =
+        releaseDate.isNotEmpty
+            ? releaseDate.split('-')[0]
+            : DateTime.now().year.toString();
 
     List<String> artists = [];
     List<String> artistIds = []; // List for artist IDs
@@ -132,62 +136,68 @@ class SpotifyService {
     String pLine = "℗ $releaseYear $label";
 
     // Create Track objects from the album's tracks with your Track model structure
-    List<Track> tracks = tracksData.map<Track>((trackData) {
-      List<String> primaryArtists = [];
-      List<String> primaryArtistIds = []; // List for track artist IDs
+    List<Track> tracks =
+        tracksData.map<Track>((trackData) {
+          List<String> primaryArtists = [];
+          List<String> primaryArtistIds = []; // List for track artist IDs
 
-      for (var artist in trackData['artists']) {
-        primaryArtists.add(artist['name']);
-        primaryArtistIds.add('spotify:${artist['id']}');
-      }
+          for (var artist in trackData['artists']) {
+            primaryArtists.add(artist['name']);
+            primaryArtistIds.add('spotify:${artist['id']}');
+          }
 
-      // Extract featuring artists (those not in primary artists)
-      List<String>? featuredArtists;
-      List<String>? featuredArtistIds;
+          // Extract featuring artists (those not in primary artists)
+          List<String>? featuredArtists;
+          List<String>? featuredArtistIds;
 
-      if (trackData['artists'].length > 1) {
-        // Consider artists beyond the first one as featuring
-        featuredArtists = [];
-        featuredArtistIds = [];
+          if (trackData['artists'].length > 1) {
+            // Consider artists beyond the first one as featuring
+            featuredArtists = [];
+            featuredArtistIds = [];
 
-        for (var i = 1; i < trackData['artists'].length; i++) {
-          featuredArtists.add(trackData['artists'][i]['name']);
-          featuredArtistIds.add('spotify:${trackData['artists'][i]['id']}');
-        }
-      }
+            for (var i = 1; i < trackData['artists'].length; i++) {
+              featuredArtists.add(trackData['artists'][i]['name']);
+              featuredArtistIds.add('spotify:${trackData['artists'][i]['id']}');
+            }
+          }
 
-      String isrc = '';
-      if (trackData['external_ids'] != null &&
-          trackData['external_ids']['isrc'] != null) {
-        isrc = trackData['external_ids']['isrc'];
-      }
+          String isrc = '';
+          if (trackData['external_ids'] != null &&
+              trackData['external_ids']['isrc'] != null) {
+            isrc = trackData['external_ids']['isrc'];
+          }
 
-      return Track(
-        trackNumber: trackData['track_number'] ??
-            0, // Add track number from Spotify data
-        title: trackData['name'] ?? '',
-        version: null,
-        isExplicit: trackData['explicit'] ?? false,
-        primaryArtists: primaryArtists,
-        primaryArtistIds: primaryArtistIds, // Add artist IDs
-        featuredArtists: featuredArtists,
-        featuredArtistIds: featuredArtistIds, // Add featured artist IDs
-        genre: 'Pop', // Ensure genre is never empty
-        performersWithRoles: [], // These would need to be populated from another source
-        songwritersWithRoles: [], // These would need to be populated from another source
-        productionWithRoles: [], // These would need to be populated from another source
-        isrc: isrc,
-        uid: trackData['id'] ?? '',
-        artworkUrl: coverImage,
-        downloadUrl: trackData['preview_url'] ?? '',
-      );
-    }).toList();
+          return Track(
+            trackNumber:
+                trackData['track_number'] ??
+                0, // Add track number from Spotify data
+            title: trackData['name'] ?? '',
+            version: null,
+            isExplicit: trackData['explicit'] ?? false,
+            primaryArtists: primaryArtists,
+            primaryArtistIds: primaryArtistIds, // Add artist IDs
+            featuredArtists: featuredArtists,
+            featuredArtistIds: featuredArtistIds, // Add featured artist IDs
+            genre: 'Pop', // Ensure genre is never empty
+            performersWithRoles:
+                [], // These would need to be populated from another source
+            songwritersWithRoles:
+                [], // These would need to be populated from another source
+            productionWithRoles:
+                [], // These would need to be populated from another source
+            isrc: isrc,
+            uid: trackData['id'] ?? '',
+            artworkUrl: coverImage,
+            downloadUrl: trackData['preview_url'] ?? '',
+          );
+        }).toList();
 
     // Create a properly formatted release date in ISO format
     String formattedReleaseDate = '';
     try {
       final DateTime parsedDate = DateTime.parse(
-          releaseDate.length >= 10 ? releaseDate : '$releaseDate-01-01');
+        releaseDate.length >= 10 ? releaseDate : '$releaseDate-01-01',
+      );
       formattedReleaseDate = parsedDate.toIso8601String();
     } catch (e) {
       // Fallback to current date + 1 month
@@ -203,18 +213,20 @@ class SpotifyService {
     if (albumData['artists'] != null && albumData['artists'].isNotEmpty) {
       try {
         final artistId = albumData['artists'][0]['id'];
-        _fetchArtistGenres(artistId).then((genres) {
-          if (genres.isNotEmpty) {
-            genre = _mapToStandardGenre(genres[0]);
-            if (genres.length > 1) {
-              subgenre = genres[1];
-            } else {
-              subgenre = genre; // Fall back to genre if no subgenre
-            }
-          }
-        }).catchError((_) {
-          // Silently fail if we can't fetch genres
-        });
+        _fetchArtistGenres(artistId)
+            .then((genres) {
+              if (genres.isNotEmpty) {
+                genre = _mapToStandardGenre(genres[0]);
+                if (genres.length > 1) {
+                  subgenre = genres[1];
+                } else {
+                  subgenre = genre; // Fall back to genre if no subgenre
+                }
+              }
+            })
+            .catchError((_) {
+              // Silently fail if we can't fetch genres
+            });
       } catch (e) {
         // Continue with default genre if artist genre fetch fails
       }
@@ -231,6 +243,7 @@ class SpotifyService {
     ];
 
     return Product(
+      userId: auth.getUser()!.uid,
       type: _mapAlbumTypeToProductType(albumType, tracks.length),
       productName: albumData['name'] ?? '',
       productArtists: artists,
@@ -244,7 +257,7 @@ class SpotifyService {
       uid: albumData['id'] ?? '',
       songs: tracks,
       coverImage: coverImage,
-      state: 'draft',
+      state: 'Draft',
       // Additional fields that were missing before:
       cLineYear: releaseYear,
       pLineYear: releaseYear,
@@ -368,7 +381,8 @@ class SpotifyService {
   // Basic language detection based on text content
   String _determineLanguageFromText(String text) {
     // Simple heuristic - detect Spanish by checking for common Spanish characters
-    bool hasSpanishChars = text.contains('ñ') ||
+    bool hasSpanishChars =
+        text.contains('ñ') ||
         text.contains('á') ||
         text.contains('é') ||
         text.contains('í') ||
@@ -413,9 +427,11 @@ class SpotifyService {
       );
 
       // Store release date for determining the latest release
-      DateTime releaseDate = DateTime.parse(product.releaseDate.length >= 10
-          ? product.releaseDate
-          : '${product.releaseDate}-01-01'); // Handle year-only dates
+      DateTime releaseDate = DateTime.parse(
+        product.releaseDate.length >= 10
+            ? product.releaseDate
+            : '${product.releaseDate}-01-01',
+      ); // Handle year-only dates
 
       projectReleaseDate[projectId] = releaseDate;
       projectLatestAlbum[projectId] = albumData;

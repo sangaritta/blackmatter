@@ -91,6 +91,7 @@ class UploadTabState extends State<UploadTab>
   Map<String, bool> isUploading = {};
   Map<String, String> fileUrls = {};
   bool isDragging = false;
+  bool _isReordering = false;
 
   late TrackListBloc _trackListBloc;
 
@@ -105,7 +106,8 @@ class UploadTabState extends State<UploadTab>
           selectedTrackIndex = -1;
         });
       }
-    } else if (selectedTrackIndex == -1 || selectedTrackIndex >= tracks.length) {
+    } else if (selectedTrackIndex == -1 ||
+        selectedTrackIndex >= tracks.length) {
       setState(() {
         selectedTrackIndex = 0;
       });
@@ -391,7 +393,10 @@ class UploadTabState extends State<UploadTab>
               return const Center(child: LoadingIndicator());
             } else if (state is TrackListLoaded) {
               final trackList = state.tracks;
-              if (mounted && trackList.isNotEmpty && (selectedTrackIndex == -1 || selectedTrackIndex >= trackList.length)) {
+              if (mounted &&
+                  trackList.isNotEmpty &&
+                  (selectedTrackIndex == -1 ||
+                      selectedTrackIndex >= trackList.length)) {
                 WidgetsBinding.instance.addPostFrameCallback((_) {
                   if (mounted) {
                     setState(() {
@@ -423,6 +428,11 @@ class UploadTabState extends State<UploadTab>
     List<Map<String, dynamic>> tracks,
     bool isMobile,
   ) {
+    if (_isReordering) {
+      return const Center(
+        child: LoadingIndicator(size: 50, color: Colors.white),
+      );
+    }
     final List<Track> typedTracks =
         tracks.map((map) => Track.fromMap(map)).toList();
     // DEBUG: Check for null or duplicate UIDs
@@ -445,102 +455,28 @@ class UploadTabState extends State<UploadTab>
         ),
       );
     }
-    return ReorderableListView.builder(
-      itemCount: typedTracks.length,
-      buildDefaultDragHandles: false,
-      onReorder: (oldIndex, newIndex) {
-        _handleReorder(oldIndex, newIndex, tracks);
-      },
-      itemBuilder: (context, index) {
-        final track = typedTracks[index];
-        final trackKey = ValueKey('${track.uid ?? 'track'}_$index');
-        return isMobile
-            ? Card(
-              key: trackKey,
-              color:
-                  selectedTrackIndex == index
-                      ? const Color(0xFF301934)
-                      : const Color(0xFF1E1E1E),
-              elevation: selectedTrackIndex == index ? 4 : 1,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-                side:
-                    selectedTrackIndex == index
-                        ? const BorderSide(color: Color(0xFF9C27B0), width: 2)
-                        : BorderSide.none,
-              ),
-              child: InkWell(
-                onTap: () {
-                  setState(() {
-                    selectedTrackIndex = index;
-                  });
-                  if (isMobile) {
-                    HapticFeedback.selectionClick();
-                  }
-                },
-                borderRadius: BorderRadius.circular(8),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8.0),
-                  child: ListTile(
-                    leading: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        ReorderableDragStartListener(
-                          index: index,
-                          child: Icon(
-                            Icons.drag_handle,
-                            color: Colors.grey,
-                            size: isMobile ? 28 : 24,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Container(
-                          width: 24,
-                          height: 24,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF9C27B0),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          alignment: Alignment.center,
-                          child: Text(
-                            '${index + 1}',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 12,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        const Icon(Icons.music_note, color: Colors.white),
-                      ],
-                    ),
-                    title: Text(
-                      track.title,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    subtitle: Text(
-                      track.primaryArtists.join(', '),
-                      style: const TextStyle(color: Colors.white70),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    trailing: IconButton(
-                      icon: const Icon(Icons.delete, color: Colors.red),
-                      onPressed: () {
-                        widget.onRemoveTrack(index);
-                        _ensureValidSelectedTrackIndex(tracks);
-                      },
-                    ),
-                  ),
-                ),
-              ),
-            )
-            : GestureDetector(
-              key: trackKey, // Key moved here!
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 500),
+      switchInCurve: Curves.easeOutCubic,
+      switchOutCurve: Curves.easeInCubic,
+      child: ReorderableListView.builder(
+        key: ValueKey(
+          tracks.length.toString() +
+              tracks.map((t) => t['uid'].toString()).join(),
+        ),
+        itemCount: typedTracks.length,
+        onReorder:
+            (oldIndex, newIndex) => _handleReorder(oldIndex, newIndex, tracks),
+        buildDefaultDragHandles: false,
+        itemBuilder: (context, index) {
+          final track = typedTracks[index];
+          final trackKey = ValueKey(track.uid);
+          return AnimatedContainer(
+            key: trackKey,
+            duration: const Duration(milliseconds: 500),
+            curve: Curves.easeOutCubic,
+            margin: const EdgeInsets.symmetric(vertical: 4.0),
+            child: GestureDetector(
               onTap: () {
                 setState(() {
                   selectedTrackIndex = index;
@@ -554,72 +490,52 @@ class UploadTabState extends State<UploadTab>
                 elevation: selectedTrackIndex == index ? 4 : 1,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8),
-                  side:
-                      selectedTrackIndex == index
-                          ? const BorderSide(color: Color(0xFF9C27B0), width: 2)
-                          : BorderSide.none,
+                  side: BorderSide(
+                    color:
+                        selectedTrackIndex == index
+                            ? const Color(0xFF9C27B0)
+                            : Colors.transparent,
+                    width: 2,
+                  ),
                 ),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8.0),
-                  child: ListTile(
-                    leading: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        ReorderableDragStartListener(
-                          index: index,
-                          child: Icon(
-                            Icons.drag_handle,
-                            color: Colors.grey,
-                            size: isMobile ? 28 : 24,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Container(
-                          width: 24,
-                          height: 24,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF9C27B0),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          alignment: Alignment.center,
-                          child: Text(
-                            '${index + 1}',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 12,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        const Icon(Icons.music_note, color: Colors.white),
-                      ],
-                    ),
-                    title: Text(
-                      track.title,
+                child: ListTile(
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 4,
+                  ),
+                  leading: CircleAvatar(
+                    backgroundColor: Colors.deepPurple[200],
+                    child: Text(
+                      (index + 1).toString(),
                       style: const TextStyle(
                         color: Colors.white,
                         fontWeight: FontWeight.bold,
                       ),
-                      overflow: TextOverflow.ellipsis,
                     ),
-                    subtitle: Text(
-                      track.primaryArtists.join(', '),
-                      style: const TextStyle(color: Colors.white70),
-                      overflow: TextOverflow.ellipsis,
+                  ),
+                  title: Text(
+                    _formatTrackDisplayText(track),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
                     ),
-                    trailing: IconButton(
-                      icon: const Icon(Icons.delete, color: Colors.red),
-                      onPressed: () {
-                        widget.onRemoveTrack(index);
-                        _ensureValidSelectedTrackIndex(tracks);
-                      },
-                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  subtitle: Text(
+                    _formatArtistsDisplayText(track),
+                    style: const TextStyle(color: Colors.grey),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  trailing: ReorderableDragStartListener(
+                    index: index,
+                    child: Icon(Icons.drag_handle, color: Colors.grey[400]),
                   ),
                 ),
               ),
-            );
-      },
+            ),
+          );
+        },
+      ),
     );
   }
 
@@ -637,6 +553,12 @@ class UploadTabState extends State<UploadTab>
       }
       return;
     }
+    // Show loading indicator during reorder
+    if (mounted) {
+      setState(() {
+        _isReordering = true;
+      });
+    }
     // Adjust newIndex if moving down the list
     if (newIndex > oldIndex) {
       newIndex -= 1;
@@ -648,20 +570,48 @@ class UploadTabState extends State<UploadTab>
     for (int i = 0; i < reorderedTracks.length; i++) {
       reorderedTracks[i]['trackNumber'] = i + 1;
     }
+
+    // --- Selection logic fix ---
+    int? newSelectedIndex;
+    if (selectedTrackIndex == oldIndex) {
+      // The selected track is being moved; select it at its new position.
+      newSelectedIndex = newIndex;
+    } else if (selectedTrackIndex != -1 && selectedTrackIndex < reorderedTracks.length) {
+      // The selected track is not being moved. Find its UID in the new list.
+      final selectedUid = Track.fromMap(tracks[selectedTrackIndex]).uid;
+      for (int i = 0; i < reorderedTracks.length; i++) {
+        if (Track.fromMap(reorderedTracks[i]).uid == selectedUid) {
+          newSelectedIndex = i;
+          break;
+        }
+      }
+    }
+
     try {
       await api.updateMultipleTracks(
         user.uid,
         widget.projectId,
         widget.productId,
         reorderedTracks,
-        // Removed onProgress: _onReorderProgress as optimistic UI/progress is not used.
       );
-      _ensureValidSelectedTrackIndex(reorderedTracks);
+      if (mounted && newSelectedIndex != null) {
+        setState(() {
+          selectedTrackIndex = newSelectedIndex!;
+        });
+      } else {
+        _ensureValidSelectedTrackIndex(reorderedTracks);
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error updating track order: $e')),
         );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isReordering = false;
+        });
       }
     }
   }
@@ -761,7 +711,10 @@ class UploadTabState extends State<UploadTab>
     );
   }
 
-  void _showMobileTrackEditor(BuildContext context, List<Map<String, dynamic>> tracks) {
+  void _showMobileTrackEditor(
+    BuildContext context,
+    List<Map<String, dynamic>> tracks,
+  ) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -832,7 +785,7 @@ class UploadTabState extends State<UploadTab>
     }
 
     final track = Track.fromMap(tracks[selectedTrackIndex]);
-    final fileUrl = fileUrls[track.fileName] ?? '';
+    print(track.downloadUrl);
 
     // Initialize all controllers for this track
     trackTitleControllers.putIfAbsent(
@@ -939,6 +892,7 @@ class UploadTabState extends State<UploadTab>
       artworkUrl:
           coverImageUrl ??
           '', // Use the loaded cover art URL with default empty string
+      trackId: track.uid, // Change track.id to track.uid
     );
   }
 
@@ -1009,6 +963,36 @@ class UploadTabState extends State<UploadTab>
                         },
                         child: const Text('Or Select Your Files'),
                       ),
+                      const SizedBox(height: 24),
+                      ...fileUploadProgress.entries.map((entry) {
+                        final progress = entry.value;
+                        final isActive =
+                            isUploading[entry.key] == true && progress < 1.0;
+                        if (!isActive) return const SizedBox.shrink();
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 8.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Uploading: ${entry.key}',
+                                style: const TextStyle(
+                                  color: Color(0xFF9C27B0),
+                                  fontWeight: FontWeight.bold,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              const SizedBox(height: 8),
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(8),
+                                child: _AnimatedAppleProgressBar(
+                                  value: progress,
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }).toList(),
                     ],
                   ),
                 ),
@@ -1070,6 +1054,13 @@ class UploadTabState extends State<UploadTab>
         primaryArtists: widget.productArtists,
         genre: widget.productGenre,
         artworkUrl: coverImageUrl ?? '',
+        onProgress: (progress) {
+          if (mounted) {
+            setState(() {
+              fileUploadProgress[file.name] = progress;
+            });
+          }
+        },
       );
       if (mounted) {
         setState(() {
@@ -1285,5 +1276,68 @@ class UploadTabState extends State<UploadTab>
       artistText += ' (feat. ${track.featuredArtists!.join(', ')})';
     }
     return artistText;
+  }
+}
+
+// Apple-style animated progress bar
+class _AnimatedAppleProgressBar extends StatefulWidget {
+  final double value;
+  const _AnimatedAppleProgressBar({required this.value});
+
+  @override
+  State<_AnimatedAppleProgressBar> createState() =>
+      _AnimatedAppleProgressBarState();
+}
+
+class _AnimatedAppleProgressBarState extends State<_AnimatedAppleProgressBar>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _animation;
+  double _oldValue = 0.0;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 700),
+      vsync: this,
+    );
+    _animation = Tween<double>(
+      begin: widget.value,
+      end: widget.value,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic));
+  }
+
+  @override
+  void didUpdateWidget(covariant _AnimatedAppleProgressBar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.value != oldWidget.value) {
+      _oldValue = oldWidget.value;
+      _animation = Tween<double>(begin: _oldValue, end: widget.value).animate(
+        CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic),
+      );
+      _controller.forward(from: 0);
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _animation,
+      builder: (context, child) {
+        return LinearProgressIndicator(
+          value: _animation.value,
+          minHeight: 10,
+          backgroundColor: const Color(0xFF301934),
+          valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF9C27B0)),
+        );
+      },
+    );
   }
 }

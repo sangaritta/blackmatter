@@ -825,7 +825,7 @@ class _ReleaseTabState extends State<ReleaseTab> {
                         ),
                       ),
                       child: Text(
-                        _currentState == 'Draft' ? 'Distribute' : 'Save',
+                        'Distribute',
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 16,
@@ -1146,7 +1146,7 @@ class _ReleaseTabState extends State<ReleaseTab> {
                             ),
                           ),
                           child: Text(
-                            _currentState == 'Draft' ? 'Distribute' : 'Save',
+                            'Distribute',
                             style: const TextStyle(
                               color: Colors.white,
                               fontSize: 16,

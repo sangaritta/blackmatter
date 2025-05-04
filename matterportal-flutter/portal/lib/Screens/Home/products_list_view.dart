@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:portal/Screens/Home/project_view.dart';
-import 'package:portal/Screens/Home/Mobile/mobile_project_view.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:portal/Screens/Home/responsive_project_view.dart';
 import 'package:portal/Services/api_service.dart';
 import 'package:extended_image/extended_image.dart';
+import 'package:portal/Services/auth_service.dart';
 import 'package:portal/Widgets/Common/loading_indicator.dart';
 
 class ProductsListView extends StatefulWidget {
@@ -16,7 +17,7 @@ class ProductsListViewState extends State<ProductsListView> {
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<List<Map<String, dynamic>>>(
-      stream: api.productsStreamIndex(),
+      stream: api.getUserProductsStream(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(
@@ -249,45 +250,80 @@ class ProductsListViewState extends State<ProductsListView> {
     );
   }
 
-  void _navigateToProduct(Map<String, dynamic> product) async {
+  Future<void> _navigateToProduct(Map<String, dynamic> product) async {
     try {
-      final String projectId = product['projectId'];
-      if (projectId.isEmpty) {
+      final userId = auth.getUser()?.uid;
+      String? projectId = product['projectId'] as String?;
+      if (projectId == null || projectId.isEmpty) {
+        final docRef = product['reference'];
+        if (docRef != null && docRef is DocumentReference) {
+          projectId = extractProjectIdFromPath(docRef.path);
+        }
+      }
+      if (projectId == null || projectId.isEmpty) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Error: Project ID not found')),
+            const SnackBar(
+              content: Text('Error: Product has no associated project ID'),
+            ),
           );
         }
         return;
       }
-
-      final bool isMobileView = MediaQuery.of(context).size.width <= 600;
-
+      _showLoadingDialog();
+      final project = await api.getProjectById(userId!, projectId);
+      if (!mounted) return;
+      Navigator.of(context, rootNavigator: true).pop();
+      if (project == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Error: Project not found')),
+          );
+        }
+        return;
+      }
+      if (!mounted) return;
       Navigator.of(context).push(
         MaterialPageRoute(
           builder:
-              (context) =>
-                  isMobileView
-                      ? MobileProjectView(
-                        projectId: projectId,
-                        newProject: false,
-                        initialProductId: product['id'],
-                      )
-                      : ProjectView(
-                        projectId: projectId,
-                        productUPC: product['upc'] ?? '',
-                        newProject: false,
-                        initialProductId: product['id'],
-                      ),
+              (context) => ResponsiveProjectView(
+                projectId: projectId!,
+                newProject: false,
+                productUPC: product['upc'] ?? '',
+                initialProductId: product['id'] ?? '',
+              ),
         ),
       );
     } catch (e) {
       if (mounted) {
+        try {
+          Navigator.of(context, rootNavigator: true).pop();
+        } catch (_) {}
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text('Error loading project: $e')));
       }
     }
+  }
+
+  void _showLoadingDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder:
+          (context) => const Center(
+            child: LoadingIndicator(size: 50, color: Colors.white),
+          ),
+    );
+  }
+
+  String? extractProjectIdFromPath(String path) {
+    final parts = path.split('/');
+    final projectsIndex = parts.indexOf('projects');
+    if (projectsIndex != -1 && projectsIndex + 1 < parts.length) {
+      return parts[projectsIndex + 1];
+    }
+    return null;
   }
 
   Color _getStateColor(String state) {

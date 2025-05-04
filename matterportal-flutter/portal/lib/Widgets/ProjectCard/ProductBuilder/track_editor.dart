@@ -1,19 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:portal/Constants/fonts.dart';
-import 'package:portal/Widgets/ProjectCard/text_fields.dart';
-import 'package:portal/Services/storage_service.dart';
 import 'package:portal/Constants/countries.dart';
-import 'dart:async';
-import 'package:portal/Screens/LyricsEditor/lyrics_editor.dart';
-import 'package:portal/Services/audio_player_service.dart';
+import 'package:portal/Widgets/ProjectCard/text_fields.dart';
 import 'package:portal/Services/api_service.dart';
+import 'package:portal/Services/audio_player_service.dart';
 import 'package:portal/Services/auth_service.dart';
-import 'package:portal/Widgets/ProjectCard/utils.dart';
 import 'package:portal/Widgets/ProjectCard/ProductBuilder/audio_preview.dart';
 import 'package:portal/Widgets/Common/role_based_artist_selector_dialog.dart';
 import 'package:portal/Widgets/Common/artist_selector.dart';
-import 'package:portal/Widgets/Common/artist_selector_dialog.dart';
 import 'package:portal/Constants/roles.dart';
+import 'dart:async';
+import 'package:portal/Screens/LyricsEditor/lyrics_editor.dart';
+import 'dart:developer' as developer;
 
 class TrackEditor extends StatefulWidget {
   final String fileName;
@@ -47,6 +45,7 @@ class TrackEditor extends StatefulWidget {
   final String? artworkUrl;
   final String projectId;
   final String productId;
+  final String trackId;
 
   const TrackEditor({
     super.key,
@@ -81,6 +80,7 @@ class TrackEditor extends StatefulWidget {
     this.artworkUrl,
     required this.projectId,
     required this.productId,
+    required this.trackId,
   });
 
   @override
@@ -109,7 +109,7 @@ class _TrackEditorState extends State<TrackEditor> {
   ];
 
   final _audioPlayer = audioPlayerService;
-  final List<StreamSubscription> _audioSubscriptions = [];
+  final List<StreamSubscription<dynamic>> _audioSubscriptions = [];
   Duration? _duration;
   Duration _position = Duration.zero;
   bool _isPlaying = false;
@@ -144,6 +144,14 @@ class _TrackEditorState extends State<TrackEditor> {
         _hasBeenSaved = false;
       });
       _loadTrackData(); // Reload metadata for new track
+    }
+    // PATCH: If upload just finished (isUploading changed from true to false), reload preview
+    if (oldWidget.isUploading && !widget.isUploading) {
+      setState(() {
+        _isLoading = false;
+        _isInitialized = false;
+      });
+      _initAudioPlayer();
     }
   }
 
@@ -209,21 +217,13 @@ class _TrackEditorState extends State<TrackEditor> {
         widget.productId,
       );
 
-      // Find the track with current widget's filename
+      debugPrint('[TRACK LOAD] widget.fileName: ${widget.fileName}');
+      debugPrint('[TRACK LOAD] tracks: ${tracks.toString()}');
+
+      // Find the track with current widget's filename (now using title)
       final track = tracks.firstWhere((t) {
-        // Safely extract fileName, handling both string and map cases
-        final fileName = t['fileName'];
-        if (fileName == null) return false;
-
-        if (fileName is String) {
-          return fileName == widget.fileName;
-        }
-
-        if (fileName is Map) {
-          return fileName['name'] == widget.fileName;
-        }
-
-        return false;
+        final title = t['title'];
+        return title != null && title == widget.fileName;
       }, orElse: () => {});
 
       if (track.isNotEmpty) {
@@ -235,10 +235,7 @@ class _TrackEditorState extends State<TrackEditor> {
               return {
                 'name': item['name']?.toString() ?? '',
                 'roles':
-                    (item['roles'] as List?)
-                        ?.map((role) => role.toString())
-                        .toList() ??
-                    [],
+                    (item['roles'] as List?)?.map((role) => role.toString()).toList() ?? [],
               };
             }
             return {'name': '', 'roles': <String>[]};
@@ -262,79 +259,132 @@ class _TrackEditorState extends State<TrackEditor> {
           'title': track['title']?.toString() ?? '',
           'version': track['version']?.toString() ?? '',
           'primaryArtists':
-              (track['primaryArtists'] as List?)
-                  ?.map((e) => e.toString())
-                  .toList() ??
-              [],
+              (track['primaryArtists'] as List?)?.map((e) => e.toString()).toList() ?? [],
           'featuringArtists':
-              (track['featuringArtists'] as List?)
-                  ?.map((e) => e.toString())
-                  .toList() ??
-              [],
+              (track['featuringArtists'] as List?)?.map((e) => e.toString()).toList() ?? [],
           'remixers':
-              (track['remixers'] as List?)?.map((e) => e.toString()).toList() ??
-              [],
+              (track['remixers'] as List?)?.map((e) => e.toString()).toList() ?? [],
           'isExplicit': track['isExplicit'] ?? false,
           'ownership': track['ownership']?.toString() ?? '',
           'isrcCode': track['isrcCode']?.toString() ?? '',
           'country': track['country']?.toString() ?? '',
           'nationality': track['nationality']?.toString() ?? '',
           'fileName': extractFileName(track['fileName']),
-          'artworkUrl': track['artworkUrl']?.toString() ?? '',
-          'downloadUrl': track['downloadUrl']?.toString(),
-          'storagePath': track['storagePath']?.toString(),
+          'downloadUrl': track['downloadUrl']?.toString() ?? track['fileUrl']?.toString() ?? '',
+          'artworkUrl': track['artworkUrl']?.toString(),
         };
 
-        setState(() {
-          _trackData = convertedTrack;
-          _hasBeenSaved = true;
+        if (mounted) {
+          setState(() {
+            _trackData = convertedTrack;
+            _hasBeenSaved = true;
 
-          // Initialize role-based data
-          _performersWithRoles = convertRoles(track['performers'] as List?);
-          _songwritersWithRoles = convertRoles(track['songwriters'] as List?);
-          _productionWithRoles = convertRoles(track['production'] as List?);
-        });
+            // Initialize role-based data
+            _performersWithRoles = convertRoles(track['performers'] as List?);
+            _songwritersWithRoles = convertRoles(track['songwriters'] as List?);
+            _productionWithRoles = convertRoles(track['production'] as List?);
+          });
+        }
       }
 
       _initAudioPlayer();
     } catch (e) {
-      print('Error loading track data: $e');
+      developer.log('Error loading track data: $e', name: 'TrackEditor');
       _initAudioPlayer();
     }
   }
 
   Future<void> _initAudioPlayer() async {
+    debugPrint('[AUDIO] _initAudioPlayer called. fileUrl: \x1B[38;5;6m${widget.fileUrl}\x1B[0m');
+    debugPrint('[AUDIO][DEBUG] _trackData: ${_trackData?.toString() ?? 'null'}');
     if (widget.isUploading) {
-      setState(() {
-        _isLoading = false;
-        _isInitialized = false;
-        _duration = null;
-        _position = Duration.zero;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = true; // PATCH: show loader while uploading
+          _isInitialized = false;
+          _duration = null;
+          _position = Duration.zero;
+        });
+      }
       return;
     }
-
-    // Stop any existing playback and reset state
-    await _audioPlayer.player.stop();
-    await _audioPlayer.player.dispose();
-
-    // Reinitialize the audio player with new track
-    await _audioPlayer.initializeAudio(
-      downloadUrl: _trackData?['downloadUrl'],
-      storagePath: _trackData?['storagePath'],
-      fileUrl: widget.fileUrl,
-      title: _formatTitle(),
-      artist: _formatArtists(),
-      artworkUrl: widget.artworkUrl,
-    );
+    // PATCH: Prefer preview_audio, then fileUrl, then downloadUrl
+    String? audioUrl;
+    if (_trackData != null) {
+      audioUrl = _trackData?['preview_audio'] as String?;
+      if (audioUrl == null || audioUrl.isEmpty) {
+        audioUrl = widget.fileUrl.isNotEmpty ? widget.fileUrl : (_trackData?['downloadUrl'] as String?);
+      }
+    } else {
+      // If _trackData is null (i.e., just uploaded), use widget.fileUrl
+      audioUrl = widget.fileUrl;
+    }
+    debugPrint('[AUDIO][DEBUG] Chosen audioUrl for playback: \x1B[38;5;2m$audioUrl\x1B[0m');
+    if (audioUrl != null && audioUrl.isNotEmpty) {
+      try {
+        await _audioPlayer.initializeAudio(
+          downloadUrl: audioUrl, // Pass as downloadUrl for compatibility
+          fileUrl: audioUrl,      // Also pass as fileUrl, since our service prefers downloadUrl
+          title: _formatTitle(),
+          artist: _formatArtists(),
+          artworkUrl: widget.artworkUrl,
+        );
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+            _isInitialized = true;
+          });
+        }
+      } catch (e, stack) {
+        debugPrint('[AUDIO][ERROR] Failed to initialize audio: $e\n$stack');
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+            _isInitialized = false;
+          });
+        }
+      }
+    } else {
+      debugPrint('[AUDIO][ERROR] No valid audio URL found for preview.');
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _isInitialized = false;
+        });
+      }
+    }
   }
 
-  String _formatDuration(Duration? duration) {
-    if (duration == null) return '0:00';
-    String twoDigits(int n) => n.toString().padLeft(2, '0');
-    String twoDigitMinutes = twoDigits(duration.inMinutes.remainder(60));
-    String twoDigitSeconds = twoDigits(duration.inSeconds.remainder(60));
-    return '$twoDigitMinutes:$twoDigitSeconds';
+  Widget _buildSpotifyPreview() {
+    // Always show the AudioPreview, even if not initialized or uploading
+    final fileUrl = widget.fileUrl.isNotEmpty
+        ? widget.fileUrl
+        : (_trackData?['downloadUrl'] ?? '');
+    // PATCH: If uploading just finished and fileUrl is now valid, force preview to reload
+    return AudioPreview(
+      fileName: widget.fileName,
+      fileUrl: fileUrl,
+      title: _formatTitle(),
+      artists: _formatArtists(),
+      artworkUrl: widget.artworkUrl,
+      isUploading: widget.isUploading,
+      trackData: _trackData,
+      duration: _duration,
+      position: _position,
+      isPlaying: _isPlaying,
+      isLoading: _isLoading,
+      isInitialized: _isInitialized,
+      onPlayPause: () async {
+        if (_isPlaying) {
+          await _audioPlayer.pause();
+        } else {
+          await _audioPlayer.play();
+        }
+      },
+      onSeek: (position) {
+        _audioPlayer.seek(position);
+      },
+    );
   }
 
   String _formatArtists() {
@@ -362,44 +412,6 @@ class _TrackEditorState extends State<TrackEditor> {
     }
 
     return title;
-  }
-
-  Widget _buildSpotifyPreview() {
-    return AudioPreview(
-      fileName: widget.fileName,
-      fileUrl: widget.fileUrl,
-      title: _formatTitle(),
-      artists: _formatArtists(),
-      artworkUrl: widget.artworkUrl,
-      isUploading: widget.isUploading,
-      trackData: _trackData,
-      duration: _duration,
-      position: _position,
-      isPlaying: _isPlaying,
-      isLoading: _isLoading,
-      isInitialized: _isInitialized,
-      onPlayPause: () async {
-        if (_isPlaying) {
-          await _audioPlayer.pause();
-        } else {
-          await _audioPlayer.play();
-        }
-      },
-      onSeek: (position) {
-        _audioPlayer.seek(position);
-      },
-    );
-  }
-
-  void _updateMetadata() async {
-    await _audioPlayer.initializeAudio(
-      downloadUrl: _trackData?['downloadUrl'],
-      storagePath: _trackData?['storagePath'],
-      fileUrl: widget.fileUrl,
-      title: _formatTitle(),
-      artist: _formatArtists(),
-      artworkUrl: widget.artworkUrl,
-    );
   }
 
   Future<void> _saveTrack() async {
@@ -455,71 +467,75 @@ class _TrackEditorState extends State<TrackEditor> {
     });
 
     try {
+      // Defensive: Always refresh _trackData before saving to ensure latest downloadUrl
+      if (_trackData == null || _trackData?['downloadUrl'] == null) {
+        await _loadTrackData();
+      }
+
+      // Check downloadUrl again after refresh
+      final String? downloadUrl = _trackData?['downloadUrl'];
+      if (downloadUrl == null || downloadUrl.isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Audio file is missing or not uploaded. Please upload the audio file before saving.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        setState(() {
+          _isSaving = false;
+        });
+        return;
+      }
+
       // Clean up role data by removing icon fields
       List<Map<String, dynamic>> cleanPerformers =
-          _performersWithRoles
-              .map(
-                (performer) => {
-                  'name': performer['name'],
-                  'roles': performer['roles'],
-                },
-              )
-              .toList();
+          _performersWithRoles.map((performer) => {
+            'name': performer['name'],
+            'roles': performer['roles'],
+          }).toList();
 
       List<Map<String, dynamic>> cleanSongwriters =
-          _songwritersWithRoles
-              .map(
-                (songwriter) => {
-                  'name': songwriter['name'],
-                  'roles': songwriter['roles'],
-                },
-              )
-              .toList();
+          _songwritersWithRoles.map((songwriter) => {
+            'name': songwriter['name'],
+            'roles': songwriter['roles'],
+          }).toList();
 
       List<Map<String, dynamic>> cleanProduction =
-          _productionWithRoles
-              .map(
-                (producer) => {
-                  'name': producer['name'],
-                  'roles': producer['roles'],
-                },
-              )
-              .toList();
+          _productionWithRoles.map((producer) => {
+            'name': producer['name'],
+            'roles': producer['roles'],
+          }).toList();
 
+      // PATCH: Ensure all fields are always included and never empty/overwritten with empty
       Map<String, dynamic> trackData = {
-        'title':
-            widget.titleController.text.isEmpty
-                ? widget.fileName
-                : widget.titleController.text,
-        'version': widget.versionController.text,
-        'primaryArtists': widget.primaryArtists,
-        'featuringArtists': widget.featuringArtists,
-        'remixers': widget.remixers,
+        'title': widget.titleController.text.isEmpty ? widget.fileName : widget.titleController.text,
+        'version': widget.versionController.text ?? '',
+        'primaryArtists': widget.primaryArtists.isNotEmpty ? widget.primaryArtists : <String>[],
+        'featuringArtists': widget.featuringArtists ?? <String>[],
+        'remixers': widget.remixers ?? <String>[],
         'performers': cleanPerformers,
         'songwriters': cleanSongwriters,
         'production': cleanProduction,
-        'isExplicit': widget.isExplicit,
-        'ownership': widget.ownership,
-        'isrcCode': widget.isrcController.text,
-        'country': widget.countryController.text,
-        'nationality': widget.nationalityController.text,
-        'fileName': widget.fileName,
-        'artworkUrl': widget.artworkUrl,
-        'trackNumber': _trackData?['trackNumber'], // Preserve track number
+        'isExplicit': widget.isExplicit ?? false,
+        'ownership': widget.ownership ?? '',
+        'isrcCode': widget.isrcController.text ?? '',
+        'country': widget.countryController.text ?? '',
+        'nationality': widget.nationalityController.text ?? '',
+        'fileName': widget.fileName ?? '',
+        'artworkUrl': widget.artworkUrl ?? '',
+        'downloadUrl': downloadUrl ?? '',
+        'trackNumber': _trackData?['trackNumber'] ?? 0, // Preserve track number or default
+        // PATCH: Add all extra fields that may exist in the model
+        'primaryArtistIds': _trackData?['primaryArtistIds'] ?? <String>[],
+        'featuredArtistIds': _trackData?['featuredArtistIds'] ?? <String>[],
+        'genre': _trackData?['genre'] ?? '',
+        'lyrics': _trackData?['lyrics'] ?? '',
+        'syncedLyrics': _trackData?['syncedLyrics'] ?? {},
       };
 
-      // Only include downloadUrl and storagePath if they exist in track data
-      if (_trackData != null) {
-        if (_trackData!['downloadUrl'] != null) {
-          trackData['downloadUrl'] = _trackData!['downloadUrl'];
-        }
-        if (_trackData!['storagePath'] != null) {
-          trackData['storagePath'] = _trackData!['storagePath'];
-        }
-      }
-
-      // Use existing track ID if available, otherwise generate a new one
-      final String trackId = _trackData?['trackId'] ?? generateUID();
+      final String trackId = widget.trackId;
 
       await api.saveTrack(
         auth.getUser()!.uid,
@@ -531,30 +547,26 @@ class _TrackEditorState extends State<TrackEditor> {
 
       if (mounted) {
         setState(() {
-          _hasBeenSaved = true; // Set to true after successful save
+          _isSaving = false;
+          _hasBeenSaved = true;
+          _trackData = trackData;
         });
-
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Track saved successfully'),
-            backgroundColor: Colors.green,
-          ),
+          const SnackBar(content: Text('Track information saved successfully!')),
         );
       }
     } catch (e) {
+      developer.log('Error saving track: $e', name: 'TrackEditor');
       if (mounted) {
+        setState(() {
+          _isSaving = false;
+        });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Failed to save track: $e'),
             backgroundColor: Colors.red,
           ),
         );
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isSaving = false;
-        });
       }
     }
   }
@@ -604,6 +616,7 @@ class _TrackEditorState extends State<TrackEditor> {
                   widget.onPrimaryArtistsChanged(updated);
                 },
                 collection: 'artists',
+                prefixIcon: const Icon(Icons.person, color: Colors.grey),
               ),
               const SizedBox(height: 16),
 
@@ -615,6 +628,7 @@ class _TrackEditorState extends State<TrackEditor> {
                   widget.onFeaturingArtistsChanged(updated);
                 },
                 collection: 'artists',
+                prefixIcon: const Icon(Icons.group, color: Colors.grey),
               ),
               const SizedBox(height: 16),
 
@@ -626,6 +640,7 @@ class _TrackEditorState extends State<TrackEditor> {
                   widget.onRemixersChanged(updated);
                 },
                 collection: 'artists',
+                prefixIcon: const Icon(Icons.loop, color: Colors.grey),
               ),
               const SizedBox(height: 16),
 
@@ -939,9 +954,8 @@ class _TrackEditorState extends State<TrackEditor> {
                                   MaterialPageRoute(
                                     builder:
                                         (context) => LyricsEditor(
-                                          audioUrl: st.getDownloadURL(
-                                            widget.fileUrl,
-                                          ),
+                                          // Wrap widget.fileUrl in a Future to match the LyricsEditor constructor
+                                          audioUrl: Future.value(widget.fileUrl),
                                           primaryArtists: widget.primaryArtists,
                                           trackTitle:
                                               widget
@@ -952,7 +966,7 @@ class _TrackEditorState extends State<TrackEditor> {
                                                   : widget.titleController.text,
                                           projectId: widget.projectId,
                                           productId: widget.productId,
-                                          trackId: generateUID(),
+                                          trackId: widget.trackId,
                                         ),
                                   ),
                                 );

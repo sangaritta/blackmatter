@@ -13,7 +13,7 @@ class FinanceDashboard extends StatefulWidget {
 }
 
 class _FinanceDashboardState extends State<FinanceDashboard> {
-  final ScrollController _scrollController = ScrollController();
+  //  final ScrollController _scrollController = ScrollController();
   final DateTimeRange _selectedDateRange = DateTimeRange(
     start: DateTime.now().subtract(const Duration(days: 30)),
     end: DateTime.now(),
@@ -61,16 +61,21 @@ class _FinanceDashboardState extends State<FinanceDashboard> {
                 ),
                 // Date Range Selector
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
                   decoration: BoxDecoration(
                     color: const Color(0xFF1E1B2C),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.calendar_today,
-                          color: Colors.white, size: 18),
+                      const Icon(
+                        Icons.calendar_today,
+                        color: Colors.white,
+                        size: 18,
+                      ),
                       const SizedBox(width: 8),
                       Text(
                         '${_selectedDateRange.start.toString().substring(0, 10)} - ${_selectedDateRange.end.toString().substring(0, 10)}',
@@ -144,9 +149,7 @@ class _FinanceDashboardState extends State<FinanceDashboard> {
                                   ),
                                 ),
                                 SizedBox(height: 24),
-                                Expanded(
-                                  child: PlatformEarningsChart(),
-                                ),
+                                Expanded(child: PlatformEarningsChart()),
                               ],
                             ),
                           ),
@@ -196,9 +199,7 @@ class _FinanceDashboardState extends State<FinanceDashboard> {
                           ),
 
                           // Track List
-                          const Expanded(
-                            child: TrackEarningsList(),
-                          ),
+                          const Expanded(child: TrackEarningsList()),
 
                           // Royalty Management Button
                           Padding(
@@ -207,16 +208,18 @@ class _FinanceDashboardState extends State<FinanceDashboard> {
                               onPressed: () {
                                 showDialog(
                                   context: context,
-                                  builder: (context) => const RoyaltySplitsCard(
-                                    trackTitle: 'Manage Royalty Splits',
-                                    splits: {'Artist': 1.0},
-                                  ),
+                                  builder:
+                                      (context) => const RoyaltySplitsCard(
+                                        trackTitle: 'Manage Royalty Splits',
+                                        splits: {'Artist': 1.0},
+                                      ),
                                 );
                               },
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: Colors.blue,
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 16),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 16,
+                                ),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(12),
                                 ),

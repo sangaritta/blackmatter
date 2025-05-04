@@ -1,4 +1,4 @@
-import 'dart:html' as html;
+import 'package:universal_html/html.dart' as html;
 
 Future<void> pickWavFilesWeb(Function(dynamic) handleFile) async {
   html.FileUploadInputElement uploadInput = html.FileUploadInputElement();

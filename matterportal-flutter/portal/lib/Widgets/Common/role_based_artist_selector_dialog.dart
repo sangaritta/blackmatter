@@ -283,6 +283,7 @@ class _RoleSelectionContentState extends State<RoleSelectionContent> {
   Widget build(BuildContext context) {
     return AlertDialog(
       backgroundColor: const Color(0xFF1E1B2C),
+      insetPadding: EdgeInsets.zero,
       title: Text(
         'Select Roles for ${widget.artist}',
         style: const TextStyle(color: Colors.grey),
@@ -317,10 +318,25 @@ class _RoleSelectionContentState extends State<RoleSelectionContent> {
                         (role) => role.toLowerCase().contains(_roleSearchQuery))
                     .length,
                 itemBuilder: (context, index) {
-                  final role = widget.availableRoles
+                  final filteredRoles = widget.availableRoles
                       .where((r) => r.toLowerCase().contains(_roleSearchQuery))
-                      .toList()[index];
+                      .toList();
+                  final role = filteredRoles[index];
+                  final iconList = [
+                    Icons.music_note,
+                    Icons.mic,
+                    Icons.audiotrack,
+                    Icons.library_music,
+                    Icons.album,
+                    Icons.queue_music,
+                    Icons.headset,
+                    Icons.surround_sound,
+                    Icons.volume_up,
+                    Icons.person,
+                  ];
+                  final icon = iconList[index % iconList.length];
                   return CheckboxListTile(
+                    secondary: Icon(icon, color: Colors.blueGrey[200]),
                     title: Text(
                       role,
                       style: const TextStyle(color: Colors.grey),

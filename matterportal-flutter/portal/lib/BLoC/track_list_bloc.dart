@@ -23,19 +23,23 @@ class TrackListBloc extends Bloc<TrackListEvent, TrackListState> {
       await emit.onEach<List<Map<String, dynamic>>>(
         api.getTracksStream(userId, projectId, productId),
         onData: (tracks) => emit(TrackListLoaded(tracks: tracks)),
-        onError: (error, stackTrace) => emit(TrackListError(error: error.toString())),
+        onError:
+            (error, stackTrace) =>
+                emit(TrackListError(error: error.toString())),
       );
     });
     on<TrackListReorderRequested>(_onReorderRequested);
     on<TrackListRefreshRequested>(_onRefreshRequested);
   }
 
-  void _onStarted(TrackListStarted event, Emitter<TrackListState> emit) {
-    // Legacy: not used with onEach-based handler
-  }
+  //  void _onStarted(TrackListStarted event, Emitter<TrackListState> emit) {
+  // Legacy: not used with onEach-based handler
+  //  }
 
   Future<void> _onReorderRequested(
-      TrackListReorderRequested event, Emitter<TrackListState> emit) async {
+    TrackListReorderRequested event,
+    Emitter<TrackListState> emit,
+  ) async {
     final currentState = state;
     if (currentState is TrackListLoaded) {
       final newOrder = List<Map<String, dynamic>>.from(currentState.tracks);
@@ -56,7 +60,9 @@ class TrackListBloc extends Bloc<TrackListEvent, TrackListState> {
   }
 
   void _onRefreshRequested(
-      TrackListRefreshRequested event, Emitter<TrackListState> emit) {
+    TrackListRefreshRequested event,
+    Emitter<TrackListState> emit,
+  ) {
     add(TrackListStarted());
   }
 

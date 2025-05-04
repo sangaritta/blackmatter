@@ -204,10 +204,12 @@ class _LoginScreenState extends State<LoginScreen> {
                                                       autofillHints: const [
                                                         AutofillHints.password,
                                                       ],
-                                                      onSubmitted:
-                                                          (_) => bloc.add(
-                                                                LoginSubmitted(),
-                                                              ),
+                                                      onSubmitted: (_) {
+                                                        // Update email and password in bloc before submitting
+                                                        bloc.add(LoginEmailChanged(emailCtrl.text));
+                                                        bloc.add(LoginPasswordChanged(passCtrl.text));
+                                                        bloc.add(LoginSubmitted());
+                                                      },
                                                     ),
                                                     const SizedBox(height: 18),
                                                     Center(

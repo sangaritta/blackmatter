@@ -113,6 +113,7 @@ class InformationTabState extends State<InformationTab> {
   List<Map<String, dynamic>> _labels = [];
   bool _isLoadingProduct = false;
   bool _hasUnsavedChanges = false;
+  bool _hasUserEditedTitle = false; // Add this flag
   Map<String, dynamic> _originalData = {};
   bool _hasBeenSaved = false;
   double _uploadProgress = 0.0;
@@ -143,7 +144,10 @@ class InformationTabState extends State<InformationTab> {
   }
 
   // Debounce wrapper for artist add/remove
-  void debounceArtistUpdate(VoidCallback callback, {Duration duration = const Duration(milliseconds: 300)}) {
+  void debounceArtistUpdate(
+    VoidCallback callback, {
+    Duration duration = const Duration(milliseconds: 300),
+  }) {
     _artistDebounceTimer?.cancel();
     _artistDebounceTimer = Timer(duration, callback);
   }
@@ -153,7 +157,8 @@ class InformationTabState extends State<InformationTab> {
     _selectedImageBytes = widget.selectedImageBytes;
     _coverImageUrl = widget.coverImageUrl;
     widget.uidController.text = widget.productId;
-    _selectedMetadataLanguage = widget.selectedMetadataLanguage ??
+    _selectedMetadataLanguage =
+        widget.selectedMetadataLanguage ??
         (widget.metadataLanguages.isNotEmpty
             ? widget.metadataLanguages[0]
             : null);
@@ -161,7 +166,7 @@ class InformationTabState extends State<InformationTab> {
     _selectedGenre = widget.selectedGenre;
     _selectedSubgenre = widget.selectedSubgenre;
     _selectedPrice = widget.selectedPrice;
-    
+
     // Initialize the data persistence helper
     _dataPersistence = DataPersistence(
       onProductLoaded: _onProductLoaded,
@@ -184,12 +189,24 @@ class InformationTabState extends State<InformationTab> {
   }
 
   void _addControllerListeners() {
+    widget.releaseTitleController.addListener(
+      _onUserEditedTitle,
+    ); // Add listener for title
     widget.releaseVersionController.addListener(_onFieldChanged);
     widget.primaryArtistsController.addListener(_onFieldChanged);
     widget.upcController.addListener(_onFieldChanged);
     widget.labelController.addListener(_onFieldChanged);
     widget.cLineController.addListener(_onFieldChanged);
     widget.pLineController.addListener(_onFieldChanged);
+  }
+
+  void _onUserEditedTitle() {
+    if (!_hasUserEditedTitle && widget.releaseTitleController.text.isNotEmpty) {
+      setState(() {
+        _hasUserEditedTitle = true;
+      });
+    }
+    _onFieldChanged();
   }
 
   void _onFieldChanged() {
@@ -243,14 +260,17 @@ class InformationTabState extends State<InformationTab> {
 
   void _validateAndUpdateStatus() {
     final isComplete = _validationUtils.canProceedToNext(
-      hasImage: _selectedImageBytes != null || 
-                widget.selectedImageBytes != null || 
-                (_coverImageUrl != null && _coverImageUrl!.isNotEmpty) ||
-                (widget.coverImageUrl != null && widget.coverImageUrl!.isNotEmpty),
+      hasImage:
+          _selectedImageBytes != null ||
+          widget.selectedImageBytes != null ||
+          (_coverImageUrl != null && _coverImageUrl!.isNotEmpty) ||
+          (widget.coverImageUrl != null && widget.coverImageUrl!.isNotEmpty),
       hasTitle: widget.releaseTitleController.text.isNotEmpty,
       hasArtists: widget.selectedArtists.isNotEmpty,
-      isUpcValid: _autoGenerateUPC || 
-                  (!_autoGenerateUPC && _validationUtils.isValidUPC(widget.upcController.text)),
+      isUpcValid:
+          _autoGenerateUPC ||
+          (!_autoGenerateUPC &&
+              _validationUtils.isValidUPC(widget.upcController.text)),
       hasLabel: widget.labelController.text.isNotEmpty,
       hasCLine: widget.cLineController.text.isNotEmpty,
       hasPLine: widget.pLineController.text.isNotEmpty,
@@ -259,7 +279,7 @@ class InformationTabState extends State<InformationTab> {
       hasSubgenre: _selectedSubgenre != null,
       hasPrice: _selectedPrice != null,
     );
-    
+
     widget.onInformationComplete(isComplete);
   }
 
@@ -296,14 +316,16 @@ class InformationTabState extends State<InformationTab> {
   Future<void> _fetchLabels() async {
     try {
       final labels = await api.fetchLabels();
-      
+
       setState(() {
         _labels = labels;
       });
-      
+
       // Ensure the selected label exists in the available labels
       if (widget.labelController.text.isNotEmpty &&
-          !_labels.any((label) => label['name'] == widget.labelController.text)) {
+          !_labels.any(
+            (label) => label['name'] == widget.labelController.text,
+          )) {
         widget.labelController.text = ''; // Clear the label if it doesn't exist
       }
     } catch (e) {
@@ -312,15 +334,8 @@ class InformationTabState extends State<InformationTab> {
   }
 
   Future<void> _saveProductInformation(String productId) async {
-    setState(() {
-      _isLoading = true;
-      _isProcessingApi = true;
-      _apiProgress = 0.0;
-      _isUploadingImage = _selectedImageBytes != null;
-      _uploadProgress = 0.0;
-    });
-
     if (!_validateFields()) {
+      if (!mounted) return;
       setState(() {
         _isLoading = false;
         _isUploadingImage = false;
@@ -328,50 +343,78 @@ class InformationTabState extends State<InformationTab> {
       });
       return;
     }
-
+    setState(() {
+      _isLoading = true;
+      _isProcessingApi = true;
+      _apiProgress = 0.0;
+      _isUploadingImage = _selectedImageBytes != null;
+      _uploadProgress = 0.0;
+    });
     try {
       // Create the product data object
       String fullCLine = '© $_cLineYear ${widget.cLineController.text}';
       String fullPLine = '℗ $_pLineYear ${widget.pLineController.text}';
 
       ProductData productData = ProductData(
+        projectId: widget.projectId,
+        userId: auth.getUser()?.uid ?? '',
         id: productId,
         releaseTitle: widget.releaseTitleController.text,
         releaseVersion: widget.releaseVersionController.text,
         primaryArtists: widget.selectedArtists,
         primaryArtistIds: _selectedArtistIds,
-        metadataLanguage: _selectedMetadataLanguage?.code,
-        genre: _selectedGenre,
-        subgenre: _selectedSubgenre,
-        type: widget.selectedProductType,
-        price: _selectedPrice,
+        metadataLanguage: _selectedMetadataLanguage?.code ?? '',
+        genre: _selectedGenre ?? '',
+        subgenre: _selectedSubgenre ?? '',
+        type: widget.selectedProductType ?? '',
+        price: _selectedPrice ?? '',
         upc: widget.upcController.text,
         uid: widget.uidController.text,
         label: widget.labelController.text,
         cLine: fullCLine,
-        pLine: fullPLine,
         cLineYear: _cLineYear,
+        pLine: fullPLine,
         pLineYear: _pLineYear,
-        coverImage: _coverImageUrl ?? widget.coverImageUrl ?? '',
-        state: 'Draft',
         autoGenerateUPC: _autoGenerateUPC,
+        coverImage: _coverImageUrl ?? '',
+        state: 'Draft',
       );
 
-      // Use the data persistence helper to save the product
+      // Save product info (async)
       await _dataPersistence.saveProductInformation(
-        userId: auth.getUser()?.uid,
+        userId: auth.getUser()?.uid ?? '',
         projectId: widget.projectId,
         productId: productId,
         productData: productData,
         imageBytes: _selectedImageBytes,
         onProgress: (uploadProgress, apiProgress) {
-          setState(() {
-            _uploadProgress = uploadProgress;
-            _apiProgress = apiProgress;
-          });
+          if (!mounted) return;
+          if (_isUploadingImage && uploadProgress < 1.0) {
+            // Only update upload progress if image upload is in progress
+            setState(() {
+              _uploadProgress = uploadProgress;
+              _apiProgress = apiProgress;
+            });
+          } else if (_isProcessingApi && apiProgress < 1.0) {
+            // Only update API progress if API processing is in progress
+            setState(() {
+              _uploadProgress = uploadProgress;
+              _apiProgress = apiProgress;
+            });
+          } else if (uploadProgress == 1.0 && apiProgress == 1.0) {
+            // Final update at completion
+            if (mounted) {
+              setState(() {
+                _uploadProgress = 1.0;
+                _apiProgress = 1.0;
+              });
+            }
+          }
         },
       );
-
+      if (!mounted) return;
+      // Always call _onProductSaved to reset loading flags and show success
+      _onProductSaved();
       widget.tabController.animateTo(1);
     } catch (e) {
       if (mounted) {
@@ -440,19 +483,29 @@ class InformationTabState extends State<InformationTab> {
   }
 
   void _onProductLoaded(ProductData loadedProduct) {
+    debugPrint(
+      '[INFO] _onProductLoaded called with: ' +
+          loadedProduct.toMap().toString(),
+    );
+    if (!mounted) {
+      debugPrint(
+        '[WARN] _onProductLoaded: Widget not mounted, skipping update.',
+      );
+      return;
+    }
     setState(() {
       // Update all form fields with the loaded data
       if (loadedProduct.type != null) {
         widget.onProductTypeChanged(loadedProduct.type!);
       }
-      
+
       if (loadedProduct.coverImage.isNotEmpty) {
         _coverImageUrl = loadedProduct.coverImage;
         widget.onCoverImageUrlUpdated(_coverImageUrl);
       }
-      
+
       widget.onArtistsUpdated(loadedProduct.primaryArtists);
-      
+
       if (loadedProduct.primaryArtistIds != null &&
           loadedProduct.primaryArtistIds!.isNotEmpty) {
         _selectedArtistIds = loadedProduct.primaryArtistIds!;
@@ -460,41 +513,50 @@ class InformationTabState extends State<InformationTab> {
           widget.onArtistIdsUpdated!(_selectedArtistIds);
         }
       }
-      
+
       if (loadedProduct.metadataLanguage != null) {
         _selectedMetadataLanguage = widget.metadataLanguages.firstWhere(
           (lang) => lang.code == loadedProduct.metadataLanguage,
-          orElse: () => widget.metadataLanguages.isNotEmpty
-              ? widget.metadataLanguages[0]
-              : const MetadataLanguage('en', 'English'),
+          orElse:
+              () =>
+                  widget.metadataLanguages.isNotEmpty
+                      ? widget.metadataLanguages[0]
+                      : const MetadataLanguage('en', 'English'),
         );
       }
-      
-      widget.releaseTitleController.text = loadedProduct.releaseTitle;
-      widget.releaseVersionController.text = loadedProduct.releaseVersion;
+
+      // Only set text for title if it is the very first load and the controller is empty
+      if (widget.releaseTitleController.text.isEmpty) {
+        widget.releaseTitleController.text = loadedProduct.releaseTitle;
+      }
+      if (widget.releaseVersionController.text.isEmpty) {
+        widget.releaseVersionController.text = loadedProduct.releaseVersion;
+      }
       widget.labelController.text = loadedProduct.label;
       widget.upcController.text = loadedProduct.upc;
       _autoGenerateUPC = loadedProduct.autoGenerateUPC;
-      
       _selectedGenre = loadedProduct.genre;
       _selectedSubgenre = loadedProduct.subgenre;
       _selectedPrice = loadedProduct.price;
-      
       _cLineYear = loadedProduct.cLineYear;
       _pLineYear = loadedProduct.pLineYear;
-      widget.cLineController.text = loadedProduct.cLine.replaceAll('© $_cLineYear ', '');
-      widget.pLineController.text = loadedProduct.pLine.replaceAll('℗ $_pLineYear ', '');
-      
+      widget.cLineController.text = loadedProduct.cLine.replaceAll(
+        '© $_cLineYear ',
+        '',
+      );
+      widget.pLineController.text = loadedProduct.pLine.replaceAll(
+        '℗ $_pLineYear ',
+        '',
+      );
       _hasBeenSaved = true;
       _hasUnsavedChanges = false;
-      
       // Store original data for change detection
       _originalData = _getCurrentData();
-      
       _validateAndUpdateStatus();
+      debugPrint('[INFO] _onProductLoaded: UI fields updated.');
     });
   }
-  
+
   void _onProductSaved() {
     if (mounted) {
       setState(() {
@@ -504,7 +566,7 @@ class InformationTabState extends State<InformationTab> {
         _hasBeenSaved = true;
         _hasUnsavedChanges = false;
       });
-      
+
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Product information saved successfully'),
@@ -513,7 +575,7 @@ class InformationTabState extends State<InformationTab> {
       );
     }
   }
-  
+
   void _onPersistenceError(String error) {
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -531,28 +593,31 @@ class InformationTabState extends State<InformationTab> {
       case 'single':
         _selectedPrice = widget.prices.firstWhere(
           (price) => price.toLowerCase().contains('single - front'),
-          orElse: () => widget.prices.firstWhere(
-            (price) => price.toLowerCase().contains('single'),
-            orElse: () => widget.prices.first,
-          ),
+          orElse:
+              () => widget.prices.firstWhere(
+                (price) => price.toLowerCase().contains('single'),
+                orElse: () => widget.prices.first,
+              ),
         );
         break;
       case 'ep':
         _selectedPrice = widget.prices.firstWhere(
           (price) => price == "Album - EP",
-          orElse: () => widget.prices.firstWhere(
-            (price) => price == "Album - Mini EP",
-            orElse: () => widget.prices.first,
-          ),
+          orElse:
+              () => widget.prices.firstWhere(
+                (price) => price == "Album - Mini EP",
+                orElse: () => widget.prices.first,
+              ),
         );
         break;
       case 'album':
         _selectedPrice = widget.prices.firstWhere(
           (price) => price.toLowerCase().contains('album front one'),
-          orElse: () => widget.prices.firstWhere(
-            (price) => price.toLowerCase().contains('album'),
-            orElse: () => widget.prices.first,
-          ),
+          orElse:
+              () => widget.prices.firstWhere(
+                (price) => price.toLowerCase().contains('album'),
+                orElse: () => widget.prices.first,
+              ),
         );
         break;
       default:
@@ -564,10 +629,7 @@ class InformationTabState extends State<InformationTab> {
   Widget build(BuildContext context) {
     if (_isLoading) {
       return const Center(
-        child: LoadingIndicator(
-          size: 50,
-          color: Colors.white,
-        ),
+        child: LoadingIndicator(size: 50, color: Colors.white),
       );
     }
 
@@ -597,69 +659,299 @@ class InformationTabState extends State<InformationTab> {
         _isLoadingProduct
             ? const Center(child: LoadingIndicator())
             : widget.isMobile
-                ? SingleChildScrollView(
-                    child: Padding(
-                      padding: const EdgeInsets.all(16.0),
+            ? SingleChildScrollView(
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Cover image section
+                    Center(
+                      child: CoverImageSection(
+                        selectedImageBytes: _selectedImageBytes,
+                        coverImageUrl: _coverImageUrl ?? widget.coverImageUrl,
+                        onImageSelected: (bytes) {
+                          setState(() {
+                            _selectedImageBytes = bytes;
+                            widget.onImageSelected(bytes);
+                          });
+                        },
+                      ),
+                    ),
+
+                    const SizedBox(height: 16),
+
+                    // Product type and title display
+                    Text(
+                      widget.selectedProductType ?? "Product Type",
+                      style: const TextStyle(fontSize: 18, color: Colors.white),
+                    ),
+                    BlocBuilder<TitleBloc, TitleState>(
+                      builder: (context, state) {
+                        return TextField(
+                          controller: widget.releaseTitleController,
+                          onChanged: (val) {
+                            context.read<TitleBloc>().add(TitleChanged(val));
+                            // Optionally, trigger validation or other advanced logic here
+                          },
+                          decoration: InputDecoration(
+                            labelText: 'Release Title',
+                            errorText:
+                                state.isValid == false ? state.error : null,
+                          ),
+                        );
+                      },
+                    ),
+                    // Artist display
+                    if (widget.selectedArtists.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      ArtistSection.displaySelectedArtists(
+                        selectedArtists: widget.selectedArtists,
+                      ),
+                    ],
+
+                    const SizedBox(height: 16),
+
+                    // Metadata fields section - One field per row for mobile
+                    ProductMetadataFields(
+                      releaseTitleController: widget.releaseTitleController,
+                      releaseVersionController: widget.releaseVersionController,
+                      primaryArtistsController: widget.primaryArtistsController,
+                      selectedArtists: widget.selectedArtists,
+                      artistSuggestions: artistSuggestions,
+                      onArtistAdded: _addArtist,
+                      onArtistRemoved: _removeArtist,
+                      onArtistsReordered: widget.onArtistsUpdated,
+                      selectedMetadataLanguage: _selectedMetadataLanguage,
+                      metadataLanguages: widget.metadataLanguages,
+                      onMetadataLanguageChanged: (value) {
+                        setState(() {
+                          _selectedMetadataLanguage = value;
+                          _validateAndUpdateStatus();
+                        });
+                      },
+                      selectedGenre: _selectedGenre,
+                      genres: widget.genres,
+                      onGenreChanged: (value) {
+                        setState(() {
+                          _selectedGenre = value;
+                          _selectedSubgenre = null;
+                          _validateAndUpdateStatus();
+                        });
+                      },
+                      selectedSubgenre: _selectedSubgenre,
+                      subgenres: widget.subgenres,
+                      onSubgenreChanged: (value) {
+                        setState(() {
+                          _selectedSubgenre = value;
+                          _validateAndUpdateStatus();
+                        });
+                      },
+                      selectedArtistIds: _selectedArtistIds,
+                      onArtistIdsUpdated: (ids) {
+                        setState(() {
+                          _selectedArtistIds = ids;
+                          if (widget.onArtistIdsUpdated != null) {
+                            widget.onArtistIdsUpdated!(ids);
+                          }
+                        });
+                      },
+                      isMobile: true,
+                    ),
+
+                    const SizedBox(height: 16),
+
+                    // Product type dropdown
+                    ProductIdentityFields.buildProductTypeDropdown(
+                      selectedProductType: widget.selectedProductType,
+                      productTypes: widget.productTypes,
+                      onProductTypeChanged: (value) {
+                        setState(() {
+                          widget.onProductTypeChanged(value);
+                          _setInitialPrice(value);
+                        });
+                      },
+                    ),
+
+                    const SizedBox(height: 16),
+
+                    // Price dropdown - One field per row for mobile
+                    ProductIdentityFields.buildPriceDropdown(
+                      selectedPrice: _selectedPrice,
+                      prices: _getFilteredPrices(),
+                      onPriceChanged: (value) {
+                        setState(() {
+                          _selectedPrice = value;
+                          _validateAndUpdateStatus();
+                        });
+                      },
+                    ),
+
+                    const SizedBox(height: 16),
+
+                    // UPC field
+                    ProductIdentityFields.buildUPCField(
+                      upcController: widget.upcController,
+                      autoGenerateUPC: _autoGenerateUPC,
+                      isExistingProduct: _hasBeenSaved,
+                      onAutoGenerateChanged: (value) {
+                        setState(() {
+                          _autoGenerateUPC = value;
+                          if (_autoGenerateUPC) {
+                            widget.upcController.clear();
+                          }
+                          _onFieldChanged();
+                        });
+                      },
+                      onUpcChanged: () {
+                        if (!_hasBeenSaved) {
+                          setState(() {
+                            _hasUnsavedChanges = true;
+                          });
+                          _onFieldChanged();
+                        }
+                      },
+                    ),
+
+                    const SizedBox(height: 16),
+
+                    // UID field
+                    ProductIdentityFields.buildUIDField(
+                      uidController: widget.uidController,
+                    ),
+
+                    const SizedBox(height: 16),
+
+                    // Label dropdown
+                    ProductIdentityFields.buildLabelDropdown(
+                      labelController: widget.labelController,
+                      labels: _labels,
+                      onLabelChanged: (newValue) {
+                        if (newValue != null) {
+                          setState(() {
+                            widget.labelController.text = newValue;
+                            final selectedLabel = _labels.firstWhere(
+                              (label) => label['name'] == newValue,
+                              orElse: () => {'cLine': '', 'pLine': ''},
+                            );
+                            widget.cLineController.text =
+                                selectedLabel['cLine'] ?? '';
+                            widget.pLineController.text =
+                                selectedLabel['pLine'] ?? '';
+                          });
+                        }
+                      },
+                    ),
+
+                    const SizedBox(height: 16),
+
+                    // Rights fields section
+                    RightsFields(
+                      cLineController: widget.cLineController,
+                      pLineController: widget.pLineController,
+                      currentYear: _currentYear,
+                      cLineYear: _cLineYear,
+                      pLineYear: _pLineYear,
+                      onCLineYearChanged: (value) {
+                        setState(() {
+                          _cLineYear = value ?? _currentYear;
+                        });
+                      },
+                      onPLineYearChanged: (value) {
+                        setState(() {
+                          _pLineYear = value ?? _currentYear;
+                        });
+                      },
+                      isMobile: true,
+                    ),
+
+                    const SizedBox(height: 16),
+
+                    // Save button
+                    Align(
+                      alignment: Alignment.bottomRight,
+                      child: _buildSaveButton(),
+                    ),
+
+                    // Space at bottom for scrolling
+                    const SizedBox(height: 36),
+                  ],
+                ),
+              ),
+            )
+            : ListView(
+              padding: const EdgeInsets.all(16.0),
+              children: [
+                // Desktop layout
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Left column - Image
+                    CoverImageSection(
+                      selectedImageBytes: _selectedImageBytes,
+                      coverImageUrl: _coverImageUrl ?? widget.coverImageUrl,
+                      onImageSelected: (bytes) {
+                        setState(() {
+                          _selectedImageBytes = bytes;
+                          widget.onImageSelected(bytes);
+                        });
+                      },
+                    ),
+
+                    const SizedBox(width: 24),
+
+                    // Right column - Form fields
+                    Expanded(
                       child: Column(
-                        mainAxisSize: MainAxisSize.min,
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // Cover image section
-                          Center(
-                            child: CoverImageSection(
-                              selectedImageBytes: _selectedImageBytes,
-                              coverImageUrl: _coverImageUrl ?? widget.coverImageUrl,
-                              onImageSelected: (bytes) {
-                                setState(() {
-                                  _selectedImageBytes = bytes;
-                                  widget.onImageSelected(bytes);
-                                });
-                              },
-                            ),
-                          ),
-                          
-
-                          const SizedBox(height: 16),
-                          
-
-                          // Product type and title display
+                          // Product info
                           Text(
                             widget.selectedProductType ?? "Product Type",
-                            style: const TextStyle(fontSize: 18, color: Colors.white),
+                            style: const TextStyle(
+                              fontSize: 18,
+                              color: Colors.white,
+                            ),
                           ),
                           BlocBuilder<TitleBloc, TitleState>(
                             builder: (context, state) {
                               return TextField(
-                                controller: widget.releaseTitleController..text = state.title,
+                                controller: widget.releaseTitleController,
                                 onChanged: (val) {
-                                  context.read<TitleBloc>().add(TitleChanged(val));
+                                  context.read<TitleBloc>().add(
+                                    TitleChanged(val),
+                                  );
                                   // Optionally, trigger validation or other advanced logic here
                                 },
                                 decoration: InputDecoration(
                                   labelText: 'Release Title',
-                                  errorText: state.isValid == false ? state.error : null,
+                                  errorText:
+                                      state.isValid == false
+                                          ? state.error
+                                          : null,
                                 ),
                               );
                             },
                           ),
-                          // Artist display
-                          if (widget.selectedArtists.isNotEmpty) ...[
 
+                          if (widget.selectedArtists.isNotEmpty) ...[
                             const SizedBox(height: 8),
                             ArtistSection.displaySelectedArtists(
                               selectedArtists: widget.selectedArtists,
                             ),
                           ],
-                          
 
-                          const SizedBox(height: 16),
-                          
+                          const SizedBox(height: 24),
 
-                          // Metadata fields section - One field per row for mobile
+                          // Form fields
                           ProductMetadataFields(
-                            releaseTitleController: widget.releaseTitleController,
-                            releaseVersionController: widget.releaseVersionController,
-                            primaryArtistsController: widget.primaryArtistsController,
+                            releaseTitleController:
+                                widget.releaseTitleController,
+                            releaseVersionController:
+                                widget.releaseVersionController,
+                            primaryArtistsController:
+                                widget.primaryArtistsController,
                             selectedArtists: widget.selectedArtists,
                             artistSuggestions: artistSuggestions,
                             onArtistAdded: _addArtist,
@@ -699,12 +991,9 @@ class InformationTabState extends State<InformationTab> {
                                 }
                               });
                             },
-                            isMobile: true,
                           ),
-                          
 
                           const SizedBox(height: 16),
-                          
 
                           // Product type dropdown
                           ProductIdentityFields.buildProductTypeDropdown(
@@ -717,88 +1006,93 @@ class InformationTabState extends State<InformationTab> {
                               });
                             },
                           ),
-                          
 
                           const SizedBox(height: 16),
-                          
 
-                          // Price dropdown - One field per row for mobile
-                          ProductIdentityFields.buildPriceDropdown(
-                            selectedPrice: _selectedPrice,
-                            prices: _getFilteredPrices(),
-                            onPriceChanged: (value) {
-                              setState(() {
-                                _selectedPrice = value;
-                                _validateAndUpdateStatus();
-                              });
-                            },
+                          // Price, UPC, UID, Label sections
+                          Row(
+                            children: [
+                              Expanded(
+                                child: ProductIdentityFields.buildPriceDropdown(
+                                  selectedPrice: _selectedPrice,
+                                  prices: _getFilteredPrices(),
+                                  onPriceChanged: (value) {
+                                    setState(() {
+                                      _selectedPrice = value;
+                                      _validateAndUpdateStatus();
+                                    });
+                                  },
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: ProductIdentityFields.buildUPCField(
+                                  upcController: widget.upcController,
+                                  autoGenerateUPC: _autoGenerateUPC,
+                                  isExistingProduct: _hasBeenSaved,
+                                  onAutoGenerateChanged: (value) {
+                                    setState(() {
+                                      _autoGenerateUPC = value;
+                                      if (_autoGenerateUPC) {
+                                        widget.upcController.clear();
+                                      }
+                                      _onFieldChanged();
+                                    });
+                                  },
+                                  onUpcChanged: () {
+                                    if (!_hasBeenSaved) {
+                                      setState(() {
+                                        _hasUnsavedChanges = true;
+                                      });
+                                      _onFieldChanged();
+                                    }
+                                  },
+                                ),
+                              ),
+                            ],
                           ),
-                          
 
                           const SizedBox(height: 16),
-                          
 
-                          // UPC field
-                          ProductIdentityFields.buildUPCField(
-                            upcController: widget.upcController,
-                            autoGenerateUPC: _autoGenerateUPC,
-                            isExistingProduct: _hasBeenSaved,
-                            onAutoGenerateChanged: (value) {
-                              setState(() {
-                                _autoGenerateUPC = value;
-                                if (_autoGenerateUPC) {
-                                  widget.upcController.clear();
-                                }
-                                _onFieldChanged();
-                              });
-                            },
-                            onUpcChanged: () {
-                              if (!_hasBeenSaved) {
-                                setState(() {
-                                  _hasUnsavedChanges = true;
-                                });
-                                _onFieldChanged();
-                              }
-                            },
+                          Row(
+                            children: [
+                              Expanded(
+                                child: ProductIdentityFields.buildUIDField(
+                                  uidController: widget.uidController,
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: ProductIdentityFields.buildLabelDropdown(
+                                  labelController: widget.labelController,
+                                  labels: _labels,
+                                  onLabelChanged: (newValue) {
+                                    if (newValue != null) {
+                                      setState(() {
+                                        widget.labelController.text = newValue;
+                                        final selectedLabel = _labels
+                                            .firstWhere(
+                                              (label) =>
+                                                  label['name'] == newValue,
+                                              orElse:
+                                                  () => {
+                                                    'cLine': '',
+                                                    'pLine': '',
+                                                  },
+                                            );
+                                        widget.cLineController.text =
+                                            selectedLabel['cLine'] ?? '';
+                                        widget.pLineController.text =
+                                            selectedLabel['pLine'] ?? '';
+                                      });
+                                    }
+                                  },
+                                ),
+                              ),
+                            ],
                           ),
-                          
 
                           const SizedBox(height: 16),
-                          
-
-                          // UID field
-                          ProductIdentityFields.buildUIDField(
-                            uidController: widget.uidController,
-                          ),
-                          
-
-                          const SizedBox(height: 16),
-                          
-
-                          // Label dropdown
-                          ProductIdentityFields.buildLabelDropdown(
-                            labelController: widget.labelController,
-                            labels: _labels,
-                            onLabelChanged: (newValue) {
-                              if (newValue != null) {
-                                setState(() {
-                                  widget.labelController.text = newValue;
-                                  final selectedLabel = _labels.firstWhere(
-                                    (label) => label['name'] == newValue,
-                                    orElse: () => {'cLine': '', 'pLine': ''},
-                                  );
-                                  widget.cLineController.text =
-                                      selectedLabel['cLine'] ?? '';
-                                  widget.pLineController.text =
-                                      selectedLabel['pLine'] ?? '';
-                                });
-                              }
-                            },
-                          ),
-                          
-
-                          const SizedBox(height: 16),
-                          
 
                           // Rights fields section
                           RightsFields(
@@ -817,269 +1111,29 @@ class InformationTabState extends State<InformationTab> {
                                 _pLineYear = value ?? _currentYear;
                               });
                             },
-                            isMobile: true,
                           ),
-                          
 
-                          const SizedBox(height: 16),
-                          
+                          const SizedBox(height: 24),
 
                           // Save button
                           Align(
                             alignment: Alignment.bottomRight,
                             child: _buildSaveButton(),
                           ),
-                          
-
-                          // Space at bottom for scrolling
-                          const SizedBox(height: 36),
                         ],
                       ),
                     ),
-                  )
-                : ListView(
-                    padding: const EdgeInsets.all(16.0),
-                    children: [
-                      // Desktop layout
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // Left column - Image
-                          CoverImageSection(
-                            selectedImageBytes: _selectedImageBytes,
-                            coverImageUrl: _coverImageUrl ?? widget.coverImageUrl,
-                            onImageSelected: (bytes) {
-                              setState(() {
-                                _selectedImageBytes = bytes;
-                                widget.onImageSelected(bytes);
-                              });
-                            },
-                          ),
-                          
+                  ],
+                ),
+              ],
+            ),
 
-                          const SizedBox(width: 24),
-                          
-
-                          // Right column - Form fields
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                // Product info
-                                Text(
-                                  widget.selectedProductType ?? "Product Type",
-                                  style: const TextStyle(fontSize: 18, color: Colors.white),
-                                ),
-                                BlocBuilder<TitleBloc, TitleState>(
-                                  builder: (context, state) {
-                                    return TextField(
-                                      controller: widget.releaseTitleController..text = state.title,
-                                      onChanged: (val) {
-                                        context.read<TitleBloc>().add(TitleChanged(val));
-                                        // Optionally, trigger validation or other advanced logic here
-                                      },
-                                      decoration: InputDecoration(
-                                        labelText: 'Release Title',
-                                        errorText: state.isValid == false ? state.error : null,
-                                      ),
-                                    );
-                                  },
-                                ),
-                                
-
-                                if (widget.selectedArtists.isNotEmpty) ...[
-
-                                  const SizedBox(height: 8),
-                                  ArtistSection.displaySelectedArtists(
-                                    selectedArtists: widget.selectedArtists,
-                                  ),
-                                ],
-                                
-
-                                const SizedBox(height: 24),
-                                
-
-                                // Form fields
-                                ProductMetadataFields(
-                                  releaseTitleController: widget.releaseTitleController,
-                                  releaseVersionController: widget.releaseVersionController,
-                                  primaryArtistsController: widget.primaryArtistsController,
-                                  selectedArtists: widget.selectedArtists,
-                                  artistSuggestions: artistSuggestions,
-                                  onArtistAdded: _addArtist,
-                                  onArtistRemoved: _removeArtist,
-                                  onArtistsReordered: widget.onArtistsUpdated,
-                                  selectedMetadataLanguage: _selectedMetadataLanguage,
-                                  metadataLanguages: widget.metadataLanguages,
-                                  onMetadataLanguageChanged: (value) {
-                                    setState(() {
-                                      _selectedMetadataLanguage = value;
-                                      _validateAndUpdateStatus();
-                                    });
-                                  },
-                                  selectedGenre: _selectedGenre,
-                                  genres: widget.genres,
-                                  onGenreChanged: (value) {
-                                    setState(() {
-                                      _selectedGenre = value;
-                                      _selectedSubgenre = null;
-                                      _validateAndUpdateStatus();
-                                    });
-                                  },
-                                  selectedSubgenre: _selectedSubgenre,
-                                  subgenres: widget.subgenres,
-                                  onSubgenreChanged: (value) {
-                                    setState(() {
-                                      _selectedSubgenre = value;
-                                      _validateAndUpdateStatus();
-                                    });
-                                  },
-                                  selectedArtistIds: _selectedArtistIds,
-                                  onArtistIdsUpdated: (ids) {
-                                    setState(() {
-                                      _selectedArtistIds = ids;
-                                      if (widget.onArtistIdsUpdated != null) {
-                                        widget.onArtistIdsUpdated!(ids);
-                                      }
-                                    });
-                                  },
-                                ),
-                                
-                                const SizedBox(height: 16),
-                                
-                                // Product type dropdown
-                                ProductIdentityFields.buildProductTypeDropdown(
-                                  selectedProductType: widget.selectedProductType,
-                                  productTypes: widget.productTypes,
-                                  onProductTypeChanged: (value) {
-                                    setState(() {
-                                      widget.onProductTypeChanged(value);
-                                      _setInitialPrice(value);
-                                    });
-                                  },
-                                ),
-                                
-                                const SizedBox(height: 16),
-                                
-                                // Price, UPC, UID, Label sections
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: ProductIdentityFields.buildPriceDropdown(
-                                        selectedPrice: _selectedPrice,
-                                        prices: _getFilteredPrices(),
-                                        onPriceChanged: (value) {
-                                          setState(() {
-                                            _selectedPrice = value;
-                                            _validateAndUpdateStatus();
-                                          });
-                                        },
-                                      ),
-                                    ),
-                                    const SizedBox(width: 16),
-                                    Expanded(
-                                      child: ProductIdentityFields.buildUPCField(
-                                        upcController: widget.upcController,
-                                        autoGenerateUPC: _autoGenerateUPC,
-                                        isExistingProduct: _hasBeenSaved,
-                                        onAutoGenerateChanged: (value) {
-                                          setState(() {
-                                            _autoGenerateUPC = value;
-                                            if (_autoGenerateUPC) {
-                                              widget.upcController.clear();
-                                            }
-                                            _onFieldChanged();
-                                          });
-                                        },
-                                        onUpcChanged: () {
-                                          if (!_hasBeenSaved) {
-                                            setState(() {
-                                              _hasUnsavedChanges = true;
-                                            });
-                                            _onFieldChanged();
-                                          }
-                                        },
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                
-                                const SizedBox(height: 16),
-                                
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: ProductIdentityFields.buildUIDField(
-                                        uidController: widget.uidController,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 16),
-                                    Expanded(
-                                      child: ProductIdentityFields.buildLabelDropdown(
-                                        labelController: widget.labelController,
-                                        labels: _labels,
-                                        onLabelChanged: (newValue) {
-                                          if (newValue != null) {
-                                            setState(() {
-                                              widget.labelController.text = newValue;
-                                              final selectedLabel = _labels.firstWhere(
-                                                (label) => label['name'] == newValue,
-                                                orElse: () => {'cLine': '', 'pLine': ''},
-                                              );
-                                              widget.cLineController.text =
-                                                  selectedLabel['cLine'] ?? '';
-                                              widget.pLineController.text =
-                                                  selectedLabel['pLine'] ?? '';
-                                            });
-                                          }
-                                        },
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                
-                                const SizedBox(height: 16),
-                                
-                                // Rights fields section
-                                RightsFields(
-                                  cLineController: widget.cLineController,
-                                  pLineController: widget.pLineController,
-                                  currentYear: _currentYear,
-                                  cLineYear: _cLineYear,
-                                  pLineYear: _pLineYear,
-                                  onCLineYearChanged: (value) {
-                                    setState(() {
-                                      _cLineYear = value ?? _currentYear;
-                                    });
-                                  },
-                                  onPLineYearChanged: (value) {
-                                    setState(() {
-                                      _pLineYear = value ?? _currentYear;
-                                    });
-                                  },
-                                ),
-                                
-                                const SizedBox(height: 24),
-                                
-                                // Save button
-                                Align(
-                                  alignment: Alignment.bottomRight,
-                                  child: _buildSaveButton(),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-        
         // Progress overlay
         _buildProgressOverlay(),
       ],
     );
   }
-  
+
   // Helper method to get filtered prices based on product type
   List<String> _getFilteredPrices() {
     if (widget.selectedProductType == null) return widget.prices;
@@ -1092,7 +1146,8 @@ class InformationTabState extends State<InformationTab> {
       case 'ep':
         return widget.prices
             .where(
-                (price) => price == "Album - EP" || price == "Album - Mini EP")
+              (price) => price == "Album - EP" || price == "Album - Mini EP",
+            )
             .toList();
       case 'album':
         return widget.prices
@@ -1110,16 +1165,17 @@ class InformationTabState extends State<InformationTab> {
     return Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(8),
-        boxShadow: canSave
-            ? [
-                BoxShadow(
-                  color: const Color(0xFF9D6BFF).withAlpha(128),
-                  spreadRadius: 0,
-                  blurRadius: 12,
-                  offset: const Offset(0, 0),
-                ),
-              ]
-            : [],
+        boxShadow:
+            canSave
+                ? [
+                  BoxShadow(
+                    color: const Color(0xFF9D6BFF).withAlpha(128),
+                    spreadRadius: 0,
+                    blurRadius: 12,
+                    offset: const Offset(0, 0),
+                  ),
+                ]
+                : [],
       ),
       child: ElevatedButton(
         onPressed:
@@ -1127,9 +1183,7 @@ class InformationTabState extends State<InformationTab> {
         style: ElevatedButton.styleFrom(
           backgroundColor: canSave ? const Color(0xFF2D2D3A) : Colors.grey,
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
-          ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         ),
         child: Text(
           _hasBeenSaved ? 'Update' : 'Save',
@@ -1145,7 +1199,7 @@ class InformationTabState extends State<InformationTab> {
 
   Widget _buildProgressOverlay() {
     if (!_isLoading) return const SizedBox.shrink();
-    
+
     return Container(
       color: Colors.black54,
       child: Center(
@@ -1160,10 +1214,7 @@ class InformationTabState extends State<InformationTab> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const LoadingIndicator(
-                  size: 50,
-                  color: Colors.white,
-                ),
+                const LoadingIndicator(size: 50, color: Colors.white),
                 const SizedBox(height: 16),
                 SizedBox(
                   width: 240,
@@ -1172,21 +1223,13 @@ class InformationTabState extends State<InformationTab> {
                     children: [
                       const Text(
                         'Saving product information...',
-                        style: TextStyle(
-                          color: Colors.white70,
-                          fontSize: 14,
-                        ),
+                        style: TextStyle(color: Colors.white70, fontSize: 14),
                       ),
                       const SizedBox(height: 8),
                       ClipRRect(
                         borderRadius: BorderRadius.circular(4),
-                        child: LinearProgressIndicator(
+                        child: _AnimatedAppleProgressBar(
                           value: (_apiProgress * 0.2) + (_uploadProgress * 0.8),
-                          backgroundColor: const Color(0xFF1E1B2C),
-                          valueColor: const AlwaysStoppedAnimation<Color>(
-                            Color(0xFF9D6BFF),
-                          ),
-                          minHeight: 8,
                         ),
                       ),
                       const SizedBox(height: 4),
@@ -1226,6 +1269,69 @@ class InformationTabState extends State<InformationTab> {
           ),
         ),
       ),
+    );
+  }
+}
+
+// Apple-style animated progress bar (copied from upload_tab.dart)
+class _AnimatedAppleProgressBar extends StatefulWidget {
+  final double value;
+  const _AnimatedAppleProgressBar({required this.value});
+
+  @override
+  State<_AnimatedAppleProgressBar> createState() =>
+      _AnimatedAppleProgressBarState();
+}
+
+class _AnimatedAppleProgressBarState extends State<_AnimatedAppleProgressBar>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _animation;
+  double _oldValue = 0.0;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 700),
+      vsync: this,
+    );
+    _animation = Tween<double>(
+      begin: widget.value,
+      end: widget.value,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic));
+  }
+
+  @override
+  void didUpdateWidget(covariant _AnimatedAppleProgressBar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.value != oldWidget.value) {
+      _oldValue = oldWidget.value;
+      _animation = Tween<double>(begin: _oldValue, end: widget.value).animate(
+        CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic),
+      );
+      _controller.forward(from: 0);
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _animation,
+      builder: (context, child) {
+        return LinearProgressIndicator(
+          value: _animation.value,
+          minHeight: 10,
+          backgroundColor: const Color(0xFF301934),
+          valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF9C27B0)),
+        );
+      },
     );
   }
 }

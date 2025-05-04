@@ -1,9 +1,9 @@
 import 'dart:typed_data';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:portal/Constants/product.dart';
 import 'package:portal/Models/product.dart';
+import 'package:portal/Models/product_data.dart';
 import 'package:portal/Models/project.dart';
 import 'package:portal/Models/track.dart';
 import 'package:portal/Services/auth_service.dart';
@@ -13,7 +13,6 @@ import 'package:portal/Widgets/ProjectCard/ProductBuilder/upload_tab.dart';
 import 'package:portal/Widgets/ProjectCard/ProductBuilder/product_status_overlay.dart';
 import 'package:provider/provider.dart';
 import 'dart:developer' as developer;
-import 'title_bloc.dart';
 
 class ProductBuilder extends StatefulWidget {
   final String selectedProductType;
@@ -80,9 +79,11 @@ class _ProductBuilderState extends State<ProductBuilder>
       selectedPrice = null;
       // Set default title and artists for new products
       releaseTitleController.text = 'Untitled';
+      releaseVersionController.text = '';
       selectedArtists = [];
       // Create a new Product with empty songs
       _product = Product(
+        userId: auth.getUser()!.uid,
         type: baseType,
         productName: 'Untitled',
         productArtists: [],
@@ -104,8 +105,8 @@ class _ProductBuilderState extends State<ProductBuilder>
 
       // Fetch product status for existing products
       _fetchProductStatus();
-      // TODO: Load the Product from backend and assign to _product
-      _product = null; // Ensure it's initialized as null until loaded
+      // Load the Product from backend and assign to _product
+      _loadProductFromBackend();
     }
   }
 
@@ -116,14 +117,15 @@ class _ProductBuilderState extends State<ProductBuilder>
       final userId = auth.getUser()?.uid;
       if (userId == null) return;
 
-      final docSnapshot = await FirebaseFirestore.instance
-          .collection("catalog")
-          .doc(userId)
-          .collection('projects')
-          .doc(widget.projectId)
-          .collection('products')
-          .doc(widget.productId)
-          .get();
+      final docSnapshot =
+          await FirebaseFirestore.instance
+              .collection("catalog")
+              .doc(userId)
+              .collection('projects')
+              .doc(widget.projectId)
+              .collection('products')
+              .doc(widget.productId)
+              .get();
 
       if (docSnapshot.exists) {
         final data = docSnapshot.data();
@@ -134,8 +136,92 @@ class _ProductBuilderState extends State<ProductBuilder>
         }
       }
     } catch (e) {
-      developer.log('Error fetching product status: $e',
-          name: 'ProductBuilder');
+      developer.log(
+        'Error fetching product status: $e',
+        name: 'ProductBuilder',
+      );
+    }
+  }
+
+  Future<void> _loadProductFromBackend() async {
+    try {
+      final userId = auth.getUser()?.uid;
+      if (userId == null || widget.productId.isEmpty) return;
+      final docSnapshot =
+          await FirebaseFirestore.instance
+              .collection("catalog")
+              .doc(userId)
+              .collection('projects')
+              .doc(widget.projectId)
+              .collection('products')
+              .doc(widget.productId)
+              .get();
+      if (docSnapshot.exists) {
+        final data = docSnapshot.data();
+        if (data != null) {
+          // Inject projectId if missing
+          if (!data.containsKey('projectId') || data['projectId'] == null) {
+            data['projectId'] = widget.projectId;
+          }
+          final productData = ProductData.fromMap(data);
+          if (mounted) {
+            setState(() {
+              // Map ProductData to Product
+              _product = Product(
+                userId: productData.userId,
+                type: productData.type ?? '',
+                productName: productData.releaseTitle,
+                productArtists: productData.primaryArtists,
+                productArtistIds: productData.primaryArtistIds,
+                cLine: productData.cLine,
+                pLine: productData.pLine,
+                price: productData.price ?? '',
+                label: productData.label,
+                releaseDate: '', // Add mapping if available
+                upc: productData.upc,
+                uid: productData.uid,
+                songs: [], // Songs/tracks can be loaded separately
+                coverImage: productData.coverImage,
+                subgenre: productData.subgenre ?? '',
+                genre: productData.genre ?? '',
+                metadataLanguage: productData.metadataLanguage ?? 'en',
+                state: productData.state,
+                autoGenerateUPC: productData.autoGenerateUPC,
+              );
+              // Also update UI fields
+              releaseTitleController.text = productData.releaseTitle;
+              releaseVersionController.text = productData.releaseVersion;
+              primaryArtistsController.text = productData.primaryArtists.join(
+                ', ',
+              );
+              upcController.text = productData.upc;
+              uidController.text = productData.uid;
+              labelController.text = productData.label;
+              cLineController.text = productData.cLine;
+              pLineController.text = productData.pLine;
+              selectedMetadataLanguage =
+                  productData.metadataLanguage != null
+                      ? metadataLanguages.firstWhere(
+                        (ml) => ml.code == productData.metadataLanguage,
+                        orElse:
+                            () =>
+                                metadataLanguages.isNotEmpty
+                                    ? metadataLanguages[0]
+                                    : MetadataLanguage('en', 'English'),
+                      )
+                      : null;
+              selectedGenre = productData.genre;
+              selectedSubgenre = productData.subgenre;
+              selectedProductType = productData.type;
+              selectedPrice = productData.price;
+              selectedArtists = productData.primaryArtists;
+              coverImageUrl = productData.coverImage;
+            });
+          }
+        }
+      }
+    } catch (e) {
+      developer.log('Error loading product: $e', name: 'ProductBuilder');
     }
   }
 
@@ -200,143 +286,139 @@ class _ProductBuilderState extends State<ProductBuilder>
 
   @override
   Widget build(BuildContext context) {
-    return BlocProvider<TitleBloc>(
-      create: (_) => TitleBloc(initialTitle: releaseTitleController.text),
-      child: Builder(
-        builder: (context) {
-          return Expanded(
-            child: Stack(
-              children: [
-                Column(
-                  children: [
-                    TabBar(
+    return Builder(
+      builder: (context) {
+        return Expanded(
+          child: Stack(
+            children: [
+              Column(
+                children: [
+                  TabBar(
+                    controller: _tabController,
+                    labelColor: Colors.blue,
+                    unselectedLabelColor: Colors.white,
+                    tabs: [
+                      Tab(
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Text('Information'),
+                            const SizedBox(width: 8),
+                            Icon(
+                              _isInformationComplete
+                                  ? Icons.check_circle
+                                  : Icons.error_outline,
+                              color:
+                                  _isInformationComplete
+                                      ? Colors.green
+                                      : Colors.red,
+                              size: 16,
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Tab(
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [Text('Upload')],
+                        ),
+                      ),
+                      const Tab(
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [Text('Release')],
+                        ),
+                      ),
+                    ],
+                  ),
+                  Expanded(
+                    child: TabBarView(
                       controller: _tabController,
-                      labelColor: Colors.blue,
-                      unselectedLabelColor: Colors.white,
-                      tabs: [
-                        Tab(
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const Text('Information'),
-                              const SizedBox(width: 8),
-                              Icon(
-                                _isInformationComplete
-                                    ? Icons.check_circle
-                                    : Icons.error_outline,
-                                color: _isInformationComplete
-                                    ? Colors.green
-                                    : Colors.red,
-                                size: 16,
-                              ),
-                            ],
-                          ),
+                      children: [
+                        Consumer<Project>(
+                          builder: (context, project, child) {
+                            return InformationTab(
+                              productId: widget.productId,
+                              releaseTitleController: releaseTitleController,
+                              releaseVersionController:
+                                  releaseVersionController,
+                              primaryArtistsController:
+                                  primaryArtistsController,
+                              upcController: upcController,
+                              uidController: uidController,
+                              labelController: labelController,
+                              cLineController: cLineController,
+                              pLineController: pLineController,
+                              selectedMetadataLanguage:
+                                  selectedMetadataLanguage,
+                              selectedGenre: selectedGenre,
+                              selectedSubgenre: selectedSubgenre,
+                              selectedProductType: selectedProductType,
+                              selectedPrice: selectedPrice,
+                              metadataLanguages: metadataLanguages,
+                              genres: genres,
+                              subgenres: subgenres,
+                              productTypes: productTypes,
+                              prices: prices,
+                              tabController: _tabController,
+                              onPrimaryArtistsChanged: (artists) {
+                                project.updateArtist(artists);
+                              },
+                              onProductTypeChanged: _handleProductTypeChange,
+                              projectId: widget.projectId,
+                              onInformationComplete: _updateInformationStatus,
+                              selectedArtists: selectedArtists,
+                              onArtistsUpdated: _updateSelectedArtists,
+                              selectedImageBytes: _selectedImageBytes,
+                              onImageSelected: (bytes) {
+                                setState(() {
+                                  _selectedImageBytes = bytes;
+                                });
+                              },
+                              coverImageUrl: coverImageUrl,
+                              onCoverImageUrlUpdated: (url) {
+                                setState(() {
+                                  coverImageUrl = url;
+                                });
+                              },
+                            );
+                          },
                         ),
-                        const Tab(
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Text('Upload'),
-                            ],
-                          ),
+                        UploadTab(
+                          projectId: widget.projectId,
+                          productId: widget.productId,
+                          productArtists: selectedArtists,
+                          productGenre: selectedGenre ?? '',
+                          productSubgenre: selectedSubgenre ?? '',
+                          coverImageUrl: coverImageUrl ?? '',
+                          tracks:
+                              _product?.songs ??
+                              [], // Pass the Product.songs list
+                          onAddTrack: _addTrack,
+                          onUpdateTrack: _updateTrack,
+                          onRemoveTrack: _removeTrack,
                         ),
-                        const Tab(
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Text('Release'),
-                            ],
-                          ),
+                        ReleaseTab(
+                          projectId: widget.projectId,
+                          productId: widget.productId,
                         ),
                       ],
                     ),
-                    Expanded(
-                      child: TabBarView(
-                        controller: _tabController,
-                        children: [
-                          Consumer<Project>(
-                            builder: (context, project, child) {
-                              return InformationTab(
-                                productId: widget.productId,
-                                releaseTitleController: releaseTitleController,
-                                releaseVersionController:
-                                    releaseVersionController,
-                                primaryArtistsController:
-                                    primaryArtistsController,
-                                upcController: upcController,
-                                uidController: uidController,
-                                labelController: labelController,
-                                cLineController: cLineController,
-                                pLineController: pLineController,
-                                selectedMetadataLanguage:
-                                    selectedMetadataLanguage,
-                                selectedGenre: selectedGenre,
-                                selectedSubgenre: selectedSubgenre,
-                                selectedProductType: selectedProductType,
-                                selectedPrice: selectedPrice,
-                                metadataLanguages: metadataLanguages,
-                                genres: genres,
-                                subgenres: subgenres,
-                                productTypes: productTypes,
-                                prices: prices,
-                                tabController: _tabController,
-                                onPrimaryArtistsChanged: (artists) {
-                                  project.updateArtist(artists);
-                                },
-                                onProductTypeChanged: _handleProductTypeChange,
-                                projectId: widget.projectId,
-                                onInformationComplete: _updateInformationStatus,
-                                selectedArtists: selectedArtists,
-                                onArtistsUpdated: _updateSelectedArtists,
-                                selectedImageBytes: _selectedImageBytes,
-                                onImageSelected: (bytes) {
-                                  setState(() {
-                                    _selectedImageBytes = bytes;
-                                  });
-                                },
-                                coverImageUrl: coverImageUrl,
-                                onCoverImageUrlUpdated: (url) {
-                                  setState(() {
-                                    coverImageUrl = url;
-                                  });
-                                },
-                              );
-                            },
-                          ),
-                          UploadTab(
-                            projectId: widget.projectId,
-                            productId: widget.productId,
-                            productArtists: selectedArtists,
-                            productGenre: selectedGenre ?? '',
-                            productSubgenre: selectedSubgenre ?? '',
-                            coverImageUrl: coverImageUrl ?? '',
-                            tracks: _product?.songs ?? [], // Pass the Product.songs list
-                            onAddTrack: _addTrack,
-                            onUpdateTrack: _updateTrack,
-                            onRemoveTrack: _removeTrack,
-                          ),
-                          ReleaseTab(
-                            projectId: widget.projectId,
-                            productId: widget.productId,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                // Status overlay
-                if (_shouldShowStatusOverlay())
-                  ProductStatusOverlay(
-                    userId: auth.getUser()!.uid,
-                    projectId: widget.projectId,
-                    productId: widget.productId,
-                    currentStatus: productStatus,
                   ),
-              ],
-            ),
-          );
-        },
-      ),
+                ],
+              ),
+              // Status overlay
+              if (_shouldShowStatusOverlay())
+                ProductStatusOverlay(
+                  userId: auth.getUser()!.uid,
+                  projectId: widget.projectId,
+                  productId: widget.productId,
+                  currentStatus: productStatus,
+                ),
+            ],
+          ),
+        );
+      },
     );
   }
 }
@@ -354,10 +436,7 @@ class DisabledTab extends StatelessWidget {
         children: [
           const Icon(Icons.lock_outline, color: Colors.grey, size: 48),
           const SizedBox(height: 16),
-          Text(
-            message,
-            style: const TextStyle(color: Colors.grey),
-          ),
+          Text(message, style: const TextStyle(color: Colors.grey)),
         ],
       ),
     );

@@ -5,16 +5,16 @@ import 'package:portal/Screens/Home/artists_screen.dart';
 import 'package:portal/Screens/Home/bank_screen.dart';
 import 'package:portal/Screens/Home/catalog_screen.dart';
 import 'package:portal/Screens/Home/dashboard_screen.dart';
+import 'package:portal/Screens/Home/logout_helper.dart';
 import 'package:portal/Screens/Home/matter_market_screen.dart';
 import 'package:portal/Screens/Home/marketing_screen.dart';
 import 'package:portal/Screens/Home/products_list_view.dart';
 import 'package:portal/Screens/Home/settings_screen.dart';
-import 'package:portal/Screens/Login/login_screen.dart';
 import 'package:portal/Services/auth_service.dart';
 //import 'package:portal/Services/analytics_service.dart';
 // import 'package:portal/Services/fcm_service.dart';  // Commented out FCM service
-import 'package:portal/Widgets/Common/loading_indicator.dart';
 import 'package:portal/Services/api_service.dart';
+import 'package:portal/Widgets/Common/loading_indicator.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -68,6 +68,8 @@ class HomeScreenState extends State<HomeScreen> {
     _pageController.jumpToPage(index);
 
     // Track screen views for different tabs
+    // Uncomment and use this when analytics service is implemented
+    /*
     final screenNames = [
       'dashboard_screen',
       'catalog_screen',
@@ -78,7 +80,8 @@ class HomeScreenState extends State<HomeScreen> {
       'marketing_screen',
       'settings_screen',
     ];
-    //analyticsService.logScreenView(screenName: screenNames[index]);
+    analyticsService.logScreenView(screenName: screenNames[index]);
+    */
   }
 
   // Method is used in production but marked as unused due to being indirectly referenced
@@ -150,7 +153,7 @@ class HomeScreenState extends State<HomeScreen> {
               showDialog(
                 context: context,
                 builder:
-                    (context) => AlertDialog(
+                    (dialogContext) => AlertDialog(
                   icon: const Icon(Icons.warning, color: Colors.red),
                   title: Text(
                     "Log out?",
@@ -161,33 +164,23 @@ class HomeScreenState extends State<HomeScreen> {
                   actions: [
                     TextButton(
                       onPressed: () {
-                        Navigator.of(context).pop();
+                        Navigator.of(dialogContext).pop();
                       },
                       child: const Text('No'),
                     ),
                     StatefulBuilder(
-                      builder: (context, setState) {
+                      builder: (statefulContext, setInnerState) {
                         return TextButton(
                           onPressed:
                               _isLoggingOut
                                   ? null
                                   : () async {
-                                    setState(() => _isLoggingOut = true);
-                                    try {
-                                      await auth.signOut();
-                                      if (!mounted) return;
-
-                                      Navigator.of(context).pushReplacement(
-                                        MaterialPageRoute(
-                                          builder:
-                                              (c) => const LoginScreen(),
-                                        ),
-                                      );
-                                    } catch (e) {
-                                      if (!mounted) return;
-                                      setState(() => _isLoggingOut = false);
-                                      // Show error if needed
-                                    }
+                                    setInnerState(() => _isLoggingOut = true);
+                                    // Close the dialog first
+                                    Navigator.of(dialogContext).pop();
+                                    // Use the logout helper to safely perform logout
+                                    await LogoutHelper.performLogout(context);
+                                    // No need to handle state after this point as we will navigate away
                                   },
                           child:
                               _isLoggingOut
@@ -205,19 +198,7 @@ class HomeScreenState extends State<HomeScreen> {
             },
             icon: const Icon(Icons.login, color: Colors.red),
           ),
-          IconButton(
-            onPressed: () {
-              auth.signOut();
-              Navigator.of(context).pushReplacement(
-                MaterialPageRoute(
-                  builder: (c) {
-                    return const LoginScreen();
-                  },
-                ),
-              );
-            },
-            icon: Icon(Icons.person, color: Theme.of(context).primaryColor),
-          ),
+
         ],
       ),
       bottomNavigationBar:

@@ -549,7 +549,7 @@ Widget buildArtistAutocomplete({
   required Function(String) onArtistRemoved,
   required Function(List<String>) onArtistsReordered,
   required String collection,
-  Icon? prefixIcon,
+  Widget? prefixIcon, // changed from Icon? to Widget?
   bool showResetButton = false,
   VoidCallback? onReset,
   String? resetTooltip,

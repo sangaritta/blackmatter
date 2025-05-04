@@ -16,6 +16,8 @@ class Product extends ChangeNotifier {
   List<Track> songs;
   String coverImage;
   String state;
+  String userId; // User ID who owns this product
+ // User ID who owns this product
 
   // Additional fields needed for complete product metadata
   String cLineYear;
@@ -32,7 +34,6 @@ class Product extends ChangeNotifier {
   String country;
   List<String>? platforms; // Platforms for distribution services
   List<Map<String, String>>? platformsSelected; // Add platformsSelected field
-
   Product({
     required this.type,
     required this.productName,
@@ -48,6 +49,7 @@ class Product extends ChangeNotifier {
     required this.songs,
     required this.coverImage,
     required this.state,
+    required this.userId, // Required userId field
     this.cLineYear = '',
     this.pLineYear = '',
     this.autoGenerateUPC = true,
